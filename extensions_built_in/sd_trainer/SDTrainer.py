@@ -541,6 +541,39 @@ class SDTrainer(BaseSDTrainProcess):
 
         return output, batch.tensor.to(self.device_torch, dtype=get_torch_dtype(self.train_config.dtype))
 
+    def _log_per_file_loss(
+            self,
+            batch: 'DataLoaderBatchDTO',
+            per_sample_loss: torch.Tensor,
+            timesteps: Optional[torch.Tensor] = None,
+    ):
+        # `log_file_loss` isn't part of the core logger interface ÔÇö it's added
+        # to UILogger at runtime by the optional extensions/live_learning_monitor
+        # package, if present, via a monkey-patch. Without it this returns right
+        # away. Kept as a method so extensions (training_insights) can wrap it to
+        # see the per-sample losses and timesteps too.
+        #
+        # per_sample_loss is expected to have one value per item in batch.file_items,
+        # in the same order. If shapes don't line up (e.g. a loss path that combines
+        # samples differently) just skip logging for this step rather than guess.
+        if not hasattr(self.logger, 'log_file_loss'):
+            return
+        file_items = batch.file_items
+        if per_sample_loss.numel() != len(file_items):
+            return
+        values = per_sample_loss.detach().float().cpu().tolist()
+        # one timestep per sample (0..1000, higher = noisier), when it lines up
+        steps_t = [None] * len(values)
+        if timesteps is not None and timesteps.numel() == len(values):
+            steps_t = timesteps.detach().float().cpu().flatten().tolist()
+        for file_item, value, t in zip(file_items, values, steps_t):
+            self.logger.log_file_loss(
+                file_item.path, value, self.step_num, timestep=t,
+                # training resolution after bucketing, for difficulty per bucket
+                width=getattr(file_item, 'crop_width', None),
+                height=getattr(file_item, 'crop_height', None),
+            )
+
     # you can expand these in a child class to make customization easier
     def calculate_loss(
             self,
@@ -1068,6 +1101,12 @@ class SDTrainer(BaseSDTrainProcess):
             elif self.train_config.min_snr_gamma is not None and self.train_config.min_snr_gamma > 0.000001 and not ignore_snr:
                 # add min_snr_gamma
                 loss = apply_snr_weight(loss, timesteps, self.sd.noise_scheduler, self.train_config.min_snr_gamma)
+
+        # loss is still per-sample here (one value per batch item) ÔÇö record it
+        # against the file it came from before it gets reduced to a scalar
+        # below. No-op unless something (see _log_per_file_loss above) has
+        # actually given the logger a log_file_loss method to call, or wraps it.
+        self._log_per_file_loss(batch, loss, timesteps)
 
         loss = loss.mean()
         

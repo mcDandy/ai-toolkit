@@ -6,6 +6,8 @@ import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import { openConfirm } from '@/components/ConfirmModal';
+import StepThumbnailStrip from './StepThumbnailStrip';
+
 
 interface Props {
   job: Job;
@@ -161,6 +163,10 @@ export default function JobLossGraph({ job }: Props) {
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
 
   const [isZoomed, setIsZoomed] = useState(false);
+
+  // step currently under the cursor on the chart, or null when the mouse
+  // isn't over it ÔÇö drives the trained-image strip below the graph.
+  const [hoveredStep, setHoveredStep] = useState<number | null>(null);
 
   // Gate persistence writes until we've loaded any stored settings, so the
   // initial defaults don't clobber what was saved before the load effect runs.
@@ -473,6 +479,22 @@ export default function JobLossGraph({ job }: Props) {
             setIsZoomed(zoomed);
           },
         ],
+        // drives the trained-image strip below the chart. uPlot nulls
+        // cursor.idx when the mouse leaves the plot area, which we use as
+        // the "stopped hovering" signal (the mouseleave handler on the host
+        // div below is a belt-and-suspenders fallback for that).
+        setCursor: [
+          u => {
+            const idx = u.cursor.idx;
+            if (idx == null) {
+              setHoveredStep(null);
+              return;
+            }
+            const xs = u.data[0] as number[];
+            const step = xs?.[idx];
+            setHoveredStep(typeof step === 'number' ? step : null);
+          },
+        ],
       },
     };
 
@@ -522,14 +544,28 @@ export default function JobLossGraph({ job }: Props) {
   useEffect(() => {
     const el = chartHostRef.current;
     if (!el) return;
+    let raf = 0;
     const ro = new ResizeObserver(() => {
       const u = uplotRef.current;
       if (!u) return;
       const fitted = computeCanvasSize(el);
       if (fitted) u.setSize(fitted);
+      // the legend re-wraps to the new width only after setSize, so its height
+      // read above can be stale (narrow screens wrap more series per row). Fit
+      // once more against the settled legend so its last row isn't cut off.
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const settled = computeCanvasSize(el);
+        if (uplotRef.current && settled && settled.height !== uplotRef.current.height) {
+          uplotRef.current.setSize(settled);
+        }
+      });
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
   }, [hasData]);
 
   const handleResetZoom = useCallback(() => {
@@ -583,7 +619,9 @@ export default function JobLossGraph({ job }: Props) {
   const totalPoints = built.data[0]?.length ?? 0;
 
   return (
-    <div className="bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-800 flex flex-col h-full">
+    // min-h-full, not h-full: on short screens (phone landscape) the card grows
+    // and the page scrolls instead of squeezing the chart into the strip below
+    <div className="bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-800 flex flex-col min-h-full">
       <div className="bg-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <div className="h-2 w-2 rounded-full bg-blue-400" />
@@ -606,8 +644,10 @@ export default function JobLossGraph({ job }: Props) {
         </button>
       </div>
 
-      {/* Chart */}
-      <div className="px-4 pt-4 pb-4 flex-1 min-h-0 flex flex-col">
+      {/* Chart. No min-h-0 here: this wrapper must not shrink below the chart's
+          own minHeight, or the chart overflows it and the image strip below is
+          drawn on top of the graph. */}
+      <div className="px-4 pt-4 pb-4 flex-1 flex flex-col">
         <div
           className="bg-gray-950 rounded-lg border border-gray-800 relative select-none flex-1 min-h-0"
           style={{ minHeight: 240 }}
@@ -637,12 +677,21 @@ export default function JobLossGraph({ job }: Props) {
                   </button>
                 </div>
               )}
-              <div ref={chartHostRef} className="absolute top-0 left-0 right-0 bottom-2 overflow-hidden">
+              <div
+                ref={chartHostRef}
+                className="absolute top-0 left-0 right-0 bottom-2 overflow-hidden"
+                onMouseLeave={() => setHoveredStep(null)}
+              >
                 <div ref={containerRef} />
               </div>
             </>
           )}
         </div>
+      </div>
+
+      {/* Trained-image strip, synced to the hovered step above */}
+      <div className="px-4 pb-4 shrink-0">
+        <StepThumbnailStrip job={job} hoveredStep={hoveredStep} />
       </div>
 
       {/* Controls */}

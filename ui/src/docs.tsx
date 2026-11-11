@@ -288,6 +288,113 @@ const docs: { [key: string]: ConfigDoc } = {
       </>
     ),
   },
+  'insights.capacity': {
+    title: 'Capacity Probe',
+    description: (
+      <>
+        Answers &quot;is my LoRA/LoKr too small, or is it the data?&quot;. Every 100 steps it measures how much of its
+        rank each adapter module actually uses (SVD saturation), and every Gradient Probe steps it records, for a few
+        layers, the full weight gradient the loss asks for and how much of it the adapter can follow, plus how much a
+        2-16x bigger adapter could. Uses the normal training steps (hooks only), no extra passes.
+      </>
+    ),
+  },
+  'insights.caption_probe': {
+    title: 'Caption Probe',
+    description: (
+      <>
+        Every N steps, predicts one batch again (no gradients) with a blank caption, another image&apos;s caption and,
+        when the text encoder is loaded, without the trigger word. Shows whether the model uses the captions, whether
+        each caption fits its own image better than another one, and whether the trigger word is bound. Costs one to
+        three extra forward passes per probe.
+      </>
+    ),
+  },
+  'insights.on_warning': {
+    title: 'On Warning',
+    description: (
+      <>
+        What to do on a clear warning sign: NaN/Inf gradients, a gradient spike, runaway update size, collapsing sample
+        variety or samples copying training images. &quot;Save a checkpoint&quot; keeps a known-good point from just
+        before things go wrong (at most once per 500 steps; it counts toward Max Step Saves to Keep like any save).
+      </>
+    ),
+  },
+  'insights.concept_prompt': {
+    title: 'Concept Prompt',
+    description: (
+      <>
+        Optional. A short description of what you are training, e.g. &quot;translucent slime skin&quot;. At every sample
+        step a CLIP model (~600 MB, downloaded on first use, runs on CPU) scores the samples against it, so the Insights
+        tab can show whether the model learns the concept or just copies the look of the dataset. Also add a sample
+        prompt without the trigger word: it is used to measure concept bleed.
+      </>
+    ),
+  },
+  'insights.notify_url': {
+    title: 'Notify URL',
+    description: (
+      <>
+        Optional. On a warning, a short text message is POSTed here, e.g. an ntfy.sh topic URL to get a phone
+        notification. Leave empty to send nothing.
+      </>
+    ),
+  },
+  'insights.every': {
+    title: 'Measure Every',
+    description: (
+      <>
+        How often (in optimizer steps) the trainable weights are measured for the Insights tab: update size, weight
+        norm, direction consistency and a trajectory snapshot. Gradient norms are collected every step regardless and
+        averaged over this window. Lower = finer trajectory and faster warnings, at a small cost per measurement.
+      </>
+    ),
+  },
+  'insights.sample_dim': {
+    title: 'Tracked Weights',
+    description: (
+      <>
+        Number of randomly chosen weight values that are tracked, spread over all trainable tensors in proportion to
+        their size. Distances and angles over a random subset are unbiased estimates of the full ones, so the default
+        works the same for a small LoRA and a full finetune. Each trajectory snapshot costs 2 bytes per tracked weight
+        on disk (64 KB at the default).
+      </>
+    ),
+  },
+  'insights.anchors': {
+    title: 'Trajectory PCA Anchors',
+    description: (
+      <>
+        The weight trajectory is drawn on its top principal components. The axes are fitted on this many evenly spaced
+        snapshots (always including the first and the latest), and every snapshot is then projected onto them from disk
+        in chunks, so memory use stays flat no matter how long the run is.
+      </>
+    ),
+  },
+  'insights.embedding_map': {
+    title: 'Samples vs. Dataset Map',
+    description: (
+      <>
+        At every sample step, compares the generated samples with the training images: how close each sample is to its
+        nearest training image (copying), how different the samples are from each other (collapse) and how far they
+        have moved from the first samples (drift). Only image samples are used.
+      </>
+    ),
+  },
+  'insights.embedding_model': {
+    title: 'Embedding Space',
+    description: (
+      <>
+        <b>Model latents</b> (recommended): uses the latents ai-toolkit already cached for training, so the dataset
+        side costs nothing and no extra model is loaded. Samples are encoded with the model&apos;s own VAE. Needs Cache
+        Latents on the dataset. Positions reflect layout and colour.
+        <br />
+        <br />
+        <b>CLIP</b>: semantic image embeddings from a separate ~600 MB model (downloaded on first use). Positions
+        reflect content, but it is a different model from the one being trained.
+      </>
+    ),
+  },
   'train.pool_datasets': {
     title: 'Pool Datasets',
     description: (

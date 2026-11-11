@@ -119,6 +119,7 @@ export interface DatasetConfig {
   is_reg: boolean;
   network_weight: number;
   cache_latents_to_disk?: boolean;
+  cache_latents?: boolean;
   resolution: number[];
   controls: string[];
   control_path?: string | null;
@@ -264,6 +265,35 @@ export interface LoggingConfig {
   use_ui_logger: boolean;
 }
 
+// extensions/training_insights (see the Insights job tab). Every field is
+// optional; the trainer falls back to the same defaults when the block is absent.
+export interface InsightsConfig {
+  enabled?: boolean;
+  every?: number;
+  sample_dim?: number;
+  anchors?: number;
+  project_every?: number;
+  embedding_map?: boolean;
+  embedding_model?: string;
+  embedding_device?: string;
+  max_dataset_images?: number;
+  capacity?: boolean;
+  capacity_every?: number;
+  probe_every?: number;
+  probe_span?: number;
+  probe_modules?: number;
+  probe_tokens?: number;
+  caption_probe?: boolean;
+  caption_probe_every?: number;
+  on_warning?: 'save' | 'none';
+  notify_url?: string | null;
+  alert_cooldown?: number;
+  concept_prompt?: string | null;
+  concept_neutral?: string;
+  concept_model?: string;
+  concept_device?: string;
+}
+
 export interface SliderConfig {
   guidance_strength?: number;
   anchor_strength?: number;
@@ -286,6 +316,7 @@ export interface ProcessConfig {
   datasets: DatasetConfig[];
   train: TrainConfig;
   logging: LoggingConfig;
+  insights?: InsightsConfig;
   model: ModelConfig;
   sample: SampleConfig;
 }

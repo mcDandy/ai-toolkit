@@ -1,7 +1,7 @@
 'use client';
 import { isMac } from '@/helpers/basic';
 import { defaultSampleConfig } from '@/helpers/defaultSamples';
-import { JobConfig, SampleConfig, DatasetConfig, SliderConfig } from '@/types';
+import { JobConfig, SampleConfig, DatasetConfig, SliderConfig, InsightsConfig } from '@/types';
 
 export const defaultDatasetConfig: DatasetConfig = {
   folder_path: '/path/to/images/folder',
@@ -29,6 +29,31 @@ export const defaultSliderConfig: SliderConfig = {
   negative_prompt: 'person who is sad',
   target_class: 'person',
   anchor_class: '',
+};
+
+export const defaultInsightsConfig: InsightsConfig = {
+  enabled: true,
+  every: 10,
+  sample_dim: 32768,
+  anchors: 48,
+  project_every: 25,
+  embedding_map: true,
+  embedding_model: 'latent',
+  embedding_device: 'cpu',
+  max_dataset_images: 1500,
+  capacity: true,
+  capacity_every: 100,
+  probe_every: 250,
+  probe_span: 4,
+  probe_modules: 8,
+  probe_tokens: 1024,
+  caption_probe: true,
+  caption_probe_every: 25,
+  on_warning: 'save',
+  notify_url: null,
+  alert_cooldown: 500,
+  concept_prompt: null,
+  concept_neutral: 'a photo',
 };
 
 export const defaultCompileOptions = {
@@ -103,6 +128,7 @@ export const defaultJobConfig: JobConfig = {
           log_every: 1,
           use_ui_logger: true,
         },
+        insights: defaultInsightsConfig,
         model: {
           name_or_path: 'ostris/Flex.1-alpha',
           quantize: true,

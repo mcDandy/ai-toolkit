@@ -8,7 +8,9 @@ import {
   SampleTags,
 } from './options';
 import { useModelArchs } from '@/extensions/modelArchs';
-import { defaultCompileOptions, defaultDatasetConfig } from './jobConfig';
+import { defaultCompileOptions, defaultDatasetConfig, defaultInsightsConfig } from './jobConfig';
+
+const CLIP_INSIGHTS_MODEL = 'openai/clip-vit-base-patch32';
 import { GroupedSelectOption, JobConfig, SelectOption } from '@/types';
 import { objectCopy, tagsToObj, objToTags } from '@/utils/basic';
 import {
@@ -203,6 +205,9 @@ export default function SimpleJob({
   const showGPUSelect = !isMac();
 
   const validationConfig = jobConfig.config.process[0].train.validation_config;
+  // absent block = trainer defaults (enabled)
+  const insightsConfig = jobConfig.config.process[0].insights ?? {};
+  const insightsEmbeddingModel = insightsConfig.embedding_model ?? 'latent';
 
   let numDatasetCols = 4;
   let numSampleTopCols = 4;
@@ -1118,6 +1123,206 @@ export default function SimpleJob({
                   </div>
                 </>
               )}
+            </Card>
+          )}
+        </div>
+        <div>
+          {!isLlmModel && (
+            <Card
+              title="Insights"
+              toggled={insightsConfig.enabled !== false}
+              onToggle={value =>
+                setJobConfig(
+                  value
+                    ? { ...defaultInsightsConfig, ...insightsConfig, enabled: true }
+                    : { ...insightsConfig, enabled: false },
+                  'config.process[0].insights',
+                )
+              }
+            >
+              <p className="text-sm text-gray-400 mb-4">
+                Early-warning metrics shown on the job&apos;s Insights tab: update size, gradient spikes and clipping,
+                oscillation, the path the weights take, and where samples land relative to the dataset. Metrics are
+                logged as insights/* and also appear in the Loss Graph.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <NumberInput
+                  label="Measure Every (steps)"
+                  docKey="insights.every"
+                  value={insightsConfig.every ?? defaultInsightsConfig.every!}
+                  onChange={value =>
+                    setJobConfig(value ?? defaultInsightsConfig.every, 'config.process[0].insights.every')
+                  }
+                  placeholder="eg. 10"
+                  min={1}
+                />
+                <NumberInput
+                  label="Tracked Weights"
+                  docKey="insights.sample_dim"
+                  value={insightsConfig.sample_dim ?? defaultInsightsConfig.sample_dim!}
+                  onChange={value =>
+                    setJobConfig(value ?? defaultInsightsConfig.sample_dim, 'config.process[0].insights.sample_dim')
+                  }
+                  placeholder="eg. 32768"
+                  min={256}
+                />
+                <NumberInput
+                  label="Trajectory PCA Anchors"
+                  docKey="insights.anchors"
+                  value={insightsConfig.anchors ?? defaultInsightsConfig.anchors!}
+                  onChange={value =>
+                    setJobConfig(value ?? defaultInsightsConfig.anchors, 'config.process[0].insights.anchors')
+                  }
+                  placeholder="eg. 48"
+                  min={3}
+                />
+                <NumberInput
+                  label="Re-project Every (measurements)"
+                  value={insightsConfig.project_every ?? defaultInsightsConfig.project_every!}
+                  onChange={value =>
+                    setJobConfig(
+                      value ?? defaultInsightsConfig.project_every,
+                      'config.process[0].insights.project_every',
+                    )
+                  }
+                  placeholder="eg. 25"
+                  min={1}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+                <div>
+                  <Checkbox
+                    label="Samples vs. Dataset Map"
+                    docKey="insights.embedding_map"
+                    className="pt-1"
+                    checked={insightsConfig.embedding_map !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].insights.embedding_map')}
+                  />
+                </div>
+                {insightsConfig.embedding_map !== false && (
+                  <>
+                    <SelectInput
+                      label="Embedding Space"
+                      docKey="insights.embedding_model"
+                      value={insightsEmbeddingModel}
+                      onChange={value => setJobConfig(value, 'config.process[0].insights.embedding_model')}
+                      options={[
+                        { value: 'latent', label: 'Model latents (cached)' },
+                        { value: CLIP_INSIGHTS_MODEL, label: 'CLIP ViT-B/32 (~600 MB download)' },
+                        ...(insightsEmbeddingModel !== 'latent' && insightsEmbeddingModel !== CLIP_INSIGHTS_MODEL
+                          ? [{ value: insightsEmbeddingModel, label: insightsEmbeddingModel }]
+                          : []),
+                      ]}
+                    />
+                    {insightsEmbeddingModel !== 'latent' && (
+                      <SelectInput
+                        label="CLIP Device"
+                        value={insightsConfig.embedding_device ?? 'cpu'}
+                        onChange={value => setJobConfig(value, 'config.process[0].insights.embedding_device')}
+                        options={[
+                          { value: 'cpu', label: 'CPU (no VRAM)' },
+                          { value: 'cuda', label: 'GPU (borrows VRAM at sample time)' },
+                        ]}
+                      />
+                    )}
+                    <NumberInput
+                      label="Max Dataset Images"
+                      value={insightsConfig.max_dataset_images ?? defaultInsightsConfig.max_dataset_images!}
+                      onChange={value =>
+                        setJobConfig(
+                          value ?? defaultInsightsConfig.max_dataset_images,
+                          'config.process[0].insights.max_dataset_images',
+                        )
+                      }
+                      placeholder="eg. 1500"
+                      min={1}
+                    />
+                  </>
+                )}
+              </div>
+              {insightsConfig.embedding_map !== false &&
+                insightsEmbeddingModel === 'latent' &&
+                !jobConfig.config.process[0].datasets.some(d => d.cache_latents_to_disk || d.cache_latents) && (
+                  <p className="text-xs text-yellow-300 mt-3">
+                    The latent map reuses the latents cached for training. Turn on Cache Latents on a dataset, otherwise
+                    the map only shows the samples (diversity and drift still work, similarity to the dataset does not).
+                  </p>
+                )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+                <div>
+                  <Checkbox
+                    label="Capacity Probe"
+                    docKey="insights.capacity"
+                    className="pt-1"
+                    checked={insightsConfig.capacity !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].insights.capacity')}
+                  />
+                </div>
+                {insightsConfig.capacity !== false && (
+                  <NumberInput
+                    label="Gradient Probe Every (steps)"
+                    value={insightsConfig.probe_every ?? defaultInsightsConfig.probe_every!}
+                    onChange={value =>
+                      setJobConfig(value ?? defaultInsightsConfig.probe_every, 'config.process[0].insights.probe_every')
+                    }
+                    placeholder="eg. 250"
+                    min={10}
+                  />
+                )}
+                <div>
+                  <Checkbox
+                    label="Caption Probe"
+                    docKey="insights.caption_probe"
+                    className="pt-1"
+                    checked={insightsConfig.caption_probe !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].insights.caption_probe')}
+                  />
+                </div>
+                {insightsConfig.caption_probe !== false && (
+                  <NumberInput
+                    label="Caption Probe Every (steps)"
+                    value={insightsConfig.caption_probe_every ?? defaultInsightsConfig.caption_probe_every!}
+                    onChange={value =>
+                      setJobConfig(
+                        value ?? defaultInsightsConfig.caption_probe_every,
+                        'config.process[0].insights.caption_probe_every',
+                      )
+                    }
+                    placeholder="eg. 25"
+                    min={1}
+                  />
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+                <SelectInput
+                  label="On Warning"
+                  docKey="insights.on_warning"
+                  value={insightsConfig.on_warning ?? 'save'}
+                  onChange={value => setJobConfig(value, 'config.process[0].insights.on_warning')}
+                  options={[
+                    { value: 'save', label: 'Save a checkpoint' },
+                    { value: 'none', label: 'Only record it' },
+                  ]}
+                />
+                <div className="md:col-span-2">
+                  <TextInput
+                    label="Concept Prompt (optional)"
+                    docKey="insights.concept_prompt"
+                    value={insightsConfig.concept_prompt ?? ''}
+                    onChange={value => setJobConfig(value || null, 'config.process[0].insights.concept_prompt')}
+                    placeholder="eg. translucent slime skin"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <TextInput
+                    label="Notify URL (optional)"
+                    docKey="insights.notify_url"
+                    value={insightsConfig.notify_url ?? ''}
+                    onChange={value => setJobConfig(value || null, 'config.process[0].insights.notify_url')}
+                    placeholder="eg. https://ntfy.sh/my-training-topic"
+                  />
+                </div>
+              </div>
             </Card>
           )}
         </div>

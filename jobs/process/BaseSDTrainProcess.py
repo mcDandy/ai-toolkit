@@ -715,6 +715,22 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 print_acc(e)
                 print_acc("Could not save optimizer")
 
+        # with EMA on, the checkpoint above holds the EMA weights. Keep the live
+        # training weights (stashed by ema.eval()) next to optimizer.pt so a
+        # resume continues from where training actually was instead of jumping
+        # back to the lagging average. Restored in setup_ema().
+        if self.ema is not None and self.ema.collected_params is not None:
+            try:
+                torch.save(
+                    {
+                        'step': self.step_num,
+                        'params': [p.detach().cpu() for p in self.ema.collected_params],
+                    },
+                    os.path.join(self.save_root, 'ema_live_weights.pt'),
+                )
+            except Exception as e:
+                print_acc(f"Could not save live (non-EMA) weights: {e}")
+
         self.clean_up_saves()
         self.post_save_hook(file_path)
 
@@ -808,6 +824,32 @@ class BaseSDTrainProcess(BaseTrainProcess):
             # expose to the model: models that run an EMA-teacher forward during training
             # (e.g. wan21_pixel self_flow) read it from here
             self.sd.ema = self.ema
+
+            # on resume the params were loaded from a checkpoint, which holds EMA
+            # weights. The EMA above now starts from them (correct); put the live
+            # weights saved alongside back into the params to keep training on its path
+            live_path = os.path.join(self.save_root, 'ema_live_weights.pt')
+            if self.step_num > 0 and os.path.exists(live_path):
+                try:
+                    live = torch.load(live_path, weights_only=True)
+                    live_params = live['params']
+                    if live.get('step') != self.step_num:
+                        print_acc(
+                            f"Not restoring live (non-EMA) weights: saved at step {live.get('step')}, "
+                            f"resuming from step {self.step_num}. Training continues from the EMA weights."
+                        )
+                    elif len(live_params) != len(params) or any(
+                        lp.shape != p.shape for lp, p in zip(live_params, params)
+                    ):
+                        print_acc("Not restoring live (non-EMA) weights: the trainable parameters changed.")
+                    else:
+                        with torch.no_grad():
+                            for p, lp in zip(params, live_params):
+                                p.data.copy_(lp.to(p.device, dtype=p.dtype))
+                        print_acc(f"Restored live (non-EMA) training weights from {live_path}")
+                    del live, live_params
+                except Exception as e:
+                    print_acc(f"Could not restore live (non-EMA) weights from {live_path}: {e}")
 
     def before_dataset_load(self):
         pass

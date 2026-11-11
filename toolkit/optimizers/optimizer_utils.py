@@ -215,6 +215,12 @@ class Auto8bitTensor:
         return f"Auto8bitTensor({self.dequantize()})"
 
 
+# optimizer.pt is reloaded with torch.load(weights_only=True) on resume, which
+# refuses classes it does not know. Without this the 8-bit optimizers' state
+# fails to load and they silently restart from scratch on every resume.
+torch.serialization.add_safe_globals([Auto8bitTensor])
+
+
 def stochastic_grad_accummulation(param):
     if hasattr(param, "_accum_grad"):
         grad_fp32 = param._accum_grad.clone().to(torch.float32)

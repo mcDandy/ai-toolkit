@@ -1,0 +1,111 @@
+---
+# Same as train_lora_flux_24gb.yaml, with the training insights options spelled out.
+# Insights come from extensions/training_insights and show up on the job's
+# "Insights" tab in the UI: early-warning health metrics for the weights,
+# the path the weights take through parameter space, and a map of where the
+# samples land relative to the dataset images.
+#
+# The extension is on by default; the `insights:` block below is only needed to
+# change a setting. It is loaded for `job: extension` configs (all UI jobs are).
+job: extension
+config:
+  # this name will be the folder and filename name
+  name: "my_first_flux_lora_insights_v1"
+  process:
+    - type: 'sd_trainer'
+      # root folder to save training sessions/samples/weights
+      training_folder: "output"
+      device: cuda:0
+#      trigger_word: "p3r5on"
+      network:
+        type: "lora"
+        linear: 16
+        linear_alpha: 16
+      save:
+        dtype: float16 # precision to save
+        save_every: 250 # save every this many steps
+        max_step_saves_to_keep: 4 # how many intermittent saves to keep
+      datasets:
+        - folder_path: "/path/to/images/folder"
+          caption_ext: "txt"
+          caption_dropout_rate: 0.05
+          # the latent dataset map reuses these cached latents. Without latent
+          # caching only the sample-side metrics (diversity, drift) are produced
+          cache_latents_to_disk: true
+          resolution: [ 512, 768, 1024 ]
+      train:
+        batch_size: 1
+        steps: 2000
+        gradient_accumulation_steps: 1
+        train_unet: true
+        train_text_encoder: false
+        gradient_checkpointing: true
+        noise_scheduler: "flowmatch"
+        optimizer: "adamw8bit"
+        lr: 1e-4
+        # the pre-training sample is the baseline the map and "drift from base"
+        # compare against, so keep it
+        skip_first_sample: false
+        # insights/grad_norm and grad_clip_fraction come from gradient clipping
+        # (not reported for adafactor, which does not clip here)
+        max_grad_norm: 1.0
+        ema_config:
+          use_ema: true
+          ema_decay: 0.99
+        dtype: bf16
+      # insights/* metrics go through the normal logger, so the UI logger is
+      # what makes them appear on the Insights tab and in the Loss Graph
+      logging:
+        log_every: 1
+        use_ui_logger: true
+      insights:
+        enabled: true
+        # measure the weights every N optimizer steps (update ratio, weight
+        # norm, direction consistency, one trajectory snapshot)
+        every: 10
+        # random weight values tracked for the trajectory; 2 bytes each per
+        # snapshot on disk (64 KB at 32768), same cost for LoRA or full finetune
+        sample_dim: 32768
+        # evenly spaced snapshots used to fit the trajectory's PCA axes
+        anchors: 48
+        # refresh the trajectory picture every N snapshots (also at every sample)
+        project_every: 25
+        # samples vs. dataset map, computed at every sample step (image samples only)
+        embedding_map: true
+        # 'latent' = the model's own latent space: the dataset side is the
+        #   latents cached above, samples are encoded with the loaded VAE.
+        #   No extra model. Shows layout / colour similarity.
+        # or a CLIP checkpoint, e.g. 'openai/clip-vit-base-patch32' (~600 MB
+        #   download), for content similarity
+        embedding_model: latent
+        # device for CLIP only; cpu keeps it off the training GPU
+        embedding_device: cpu
+        # large datasets are evenly subsampled to this many images for the map
+        max_dataset_images: 1500
+      model:
+        name_or_path: "black-forest-labs/FLUX.1-dev"
+        is_flux: true
+        quantize: true
+      sample:
+        sampler: "flowmatch"
+        # every sample step adds a point to the dataset map; more distinct
+        # prompts make sample_diversity more meaningful
+        sample_every: 250
+        sample_start_step: 0
+        width: 1024
+        height: 1024
+        prompts:
+          - "woman with red hair, playing chess at the park, bomb going off in the background"
+          - "a woman holding a coffee cup, in a beanie, sitting at a cafe"
+          - "a horse is a DJ at a night club, fish eye lens, smoke machine, lazer lights, holding a martini"
+          - "a man showing off his cool new t shirt at the beach, a shark is jumping out of the water in the background"
+          - "a bear building a log cabin in the snow covered mountains"
+          - "photo of a man, white background, medium shot, modeling clothing, studio lighting, white backdrop"
+        neg: ""
+        seed: 42
+        walk_seed: true
+        guidance_scale: 4
+        sample_steps: 20
+meta:
+  name: "[name]"
+  version: '1.0'

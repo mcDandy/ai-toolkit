@@ -1,0 +1,237 @@
+> ai-toolkit-ui@0.1.0 build
+> tsc -p tsconfig.worker.json && next build
+
+   ▲ Next.js 15.5.21
+   - Experiments (use with caution):
+     · serverActions
+     · middlewareClientMaxBodySize: "100gb"
+
+   Creating an optimized production build ...
+Failed to compile.
+
+./src/hooks/useJobLossLog.tsx
+Error:   × Merge conflict marker encountered.
+    ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:30:1]
+ 27 │   const didInitialLoadRef = useRef(false);
+ 28 │   const inFlightRef = useRef(false);
+ 29 │
+ 30 │ <<<<<<< Updated upstream
+    · ───────
+ 31 │   // Highest step seen across every key. Polls ask for step >= this (not >) so a
+ 32 │   // key logged at that step after the previous poll is still picked up; the
+ 32 │   // per-key merge below drops the one re-sent point.
+    ╰────
+  × Merge conflict marker encountered.
+    ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:35:1]
+ 32 │   // key logged at that step after the previous poll is still picked up; the
+ 33 │   // per-key merge below drops the one re-sent point.
+ 34 │   const lastStepRef = useRef<number | null>(null);
+ 35 │ =======
+    · ───────
+ 36 │   // track last step per key so polling is incremental per series
+ 37 │   const lastStepByKeyRef = useRef<Record<string, number | null>>({});
+ 37 │   // wall_time of that last step, to notice when a resume rewrote it
+    ╰────
+  × Merge conflict marker encountered.
+    ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:40:1]
+ 37 │   const lastStepByKeyRef = useRef<Record<string, number | null>>({});
+ 38 │   // wall_time of that last step, to notice when a resume rewrote it
+ 39 │   const lastWallByKeyRef = useRef<Record<string, number | null>>({});
+ 40 │ >>>>>>> Stashed changes
+    · ───────
+ 41 │
+ 42 │   const lossKeys = useMemo(() => {
+ 42 │     const base = keys ?? [];
+    ╰────
+  × Merge conflict marker encountered.
+    ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:70:1]
+ 67 │       const newKeys = data.keys ?? [];
+ 68 │       setKeys(newKeys);
+ 69 │       const wantedLossKeys = (newKeys.length ? [...newKeys] : ['loss']).sort();
+ 70 │ <<<<<<< Updated upstream
+    · ───────
+ 71 │       const incoming = data.series ?? {};
+ 72 │       const initial = !didInitialLoadRef.current;
+ 72 │ =======
+    ╰────
+  × Merge conflict marker encountered.
+    ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:73:1]
+ 70 │ <<<<<<< Updated upstream
+ 71 │       const incoming = data.series ?? {};
+ 72 │       const initial = !didInitialLoadRef.current;
+ 73 │ =======
+    · ───────
+ 74 │
+ 75 │       // Step 2: fetch each loss key incrementally (since_step per key if polling)
+ 75 │       const requests = wantedLossKeys.map(k => {
+    ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:106:1]
+ 103 │       });
+ 104 │
+ 105 │       const results = await Promise.all(requests);
+ 106 │ >>>>>>> Stashed changes
+     · ───────
+ 107 │
+ 108 │       setSeries(prev => {
+ 108 │         const next: SeriesMap = initial ? {} : { ...prev };
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:117:1]
+ 114 │           const existing = initial ? undefined : next[k];
+ 115 │           const prevLast = existing && existing.steps.length ? existing.steps[existing.steps.length - 1] : null;
+ 116 │
+ 117 │ <<<<<<< Updated upstream
+     · ───────
+ 118 │           const steps: number[] = existing ? existing.steps.slice() : [];
+ 119 │           const values: number[] = existing ? existing.values.slice() : [];
+ 119 │           let appended = false;
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:132:1]
+ 129 │               values.push(v as number);
+ 130 │               appended = true;
+ 131 │             }
+ 132 │ =======
+     · ───────
+ 133 │           if (!didInitialLoadRef.current || r.replace) {
+ 134 │             // initial (or stale after a resume): replace
+ 134 │             next[k] = newPoints;
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:144:1]
+ 141 │           } else {
+ 142 │             // no new points: keep existing
+ 143 │             next[k] = next[k] ?? [];
+ 144 │ >>>>>>> Stashed changes
+     · ───────
+ 145 │           }
+ 146 │           if (initial || appended) next[k] = { steps, values };
+ 146 │           else next[k] = existing ?? { steps: [], values: [] };
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:149:1]
+ 146 │           if (initial || appended) next[k] = { steps, values };
+ 147 │           else next[k] = existing ?? { steps: [], values: [] };
+ 148 │
+ 149 │ <<<<<<< Updated upstream
+     · ───────
+ 150 │           const arr = next[k].steps;
+ 151 │           if (arr.length) {
+ 151 │             const last = arr[arr.length - 1];
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:155:1]
+ 152 │             const last = arr[arr.length - 1];
+ 153 │             if (maxStep == null || last > maxStep) maxStep = last;
+ 154 │           }
+ 155 │ =======
+     · ───────
+ 156 │           // update last step per key
+ 157 │           const finalArr = next[k] ?? [];
+ 157 │           lastStepByKeyRef.current[k] = finalArr.length
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:162:1]
+ 159 │             ? finalArr[finalArr.length - 1].step
+ 160 │             : (lastStepByKeyRef.current[k] ?? null);
+ 161 │           lastWallByKeyRef.current[k] = finalArr.length ? (finalArr[finalArr.length - 1].wall_time ?? null) : null;
+ 162 │ >>>>>>> Stashed changes
+     · ───────
+ 163 │         }
+ 164 │
+ 164 │         // remove stale keys that no longer exist (rare, but keeps UI clean)
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:167:1]
+ 164 │
+ 165 │         // remove stale keys that no longer exist (rare, but keeps UI clean)
+ 166 │         for (const existingKey of Object.keys(next)) {
+ 167 │ <<<<<<< Updated upstream
+     · ───────
+ 168 │           if (!wantedLossKeys.includes(existingKey)) delete next[existingKey];
+ 169 │ =======
+ 169 │           if (!wantedLossKeys.includes(existingKey)) {
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:169:1]
+ 166 │         for (const existingKey of Object.keys(next)) {
+ 167 │ <<<<<<< Updated upstream
+ 168 │           if (!wantedLossKeys.includes(existingKey)) delete next[existingKey];
+ 169 │ =======
+     · ───────
+ 170 │           if (!wantedLossKeys.includes(existingKey)) {
+ 171 │             delete next[existingKey];
+ 171 │             delete lastStepByKeyRef.current[existingKey];
+     ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:175:1]
+ 172 │             delete lastStepByKeyRef.current[existingKey];
+ 173 │             delete lastWallByKeyRef.current[existingKey];
+ 174 │           }
+ 175 │ >>>>>>> Stashed changes
+     · ───────
+ 176 │         }
+ 177 │
+ 177 │         lastStepRef.current = maxStep;
+     ╰────
+  × Expression expected
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\hooks\useJobLossLog.tsx:180:1]
+ 177 │
+ 178 │         lastStepRef.current = maxStep;
+ 179 │         return next;
+ 180 │       });
+     ·        ─
+ 181 │
+ 182 │       setStatus('success');
+ 182 │       didInitialLoadRef.current = true;
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/hooks/useJobLossLog.tsx
+./src/components/JobLossGraph.tsx
+./src/app/jobs/[jobID]/page.tsx
+
+./src/app/api/jobs/[jobID]/loss/route.ts
+Error:   × Merge conflict marker encountered.
+    ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\app\api\jobs\[jobID]\loss\route.ts:87:1]
+ 84 │     const keysRows = await all<{ key: string }>(db, `SELECT key FROM metric_keys ORDER BY key ASC`);
+ 85 │     const keys = keysRows.map((r) => r.key);
+ 86 │
+ 87 │ <<<<<<< Updated upstream
+    · ───────
+ 88 │     const parts: string[] = [];
+ 89 │     for (const key of keys) {
+ 89 │       const rows = await all<{ steps: string; vals: string }>(db, SERIES_SQL, [key, sinceStep]);
+    ╰────
+  × Merge conflict marker encountered.
+    ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\app\api\jobs\[jobID]\loss\route.ts:96:1]
+ 93 │       parts.push(`${JSON.stringify(key)}:{"steps":${steps},"values":${vals}}`);
+ 94 │     }
+ 95 │     body = `{"keys":${JSON.stringify(keys)},"since_step":${sinceStep},"series":{${parts.join(',')}}}`;
+ 96 │ =======
+    · ───────
+ 97 │     const points = await all<{
+ 98 │       step: number;
+ 98 │       wall_time: number;
+    ╰────
+  × Merge conflict marker encountered.
+     ╭─[D:\stability\Data\Packages\AI-Toolkit\ui\src\app\api\jobs\[jobID]\loss\route.ts:141:1]
+ 138 │         value: p.value ?? (p.value_text ? Number(p.value_text) : null),
+ 139 │       })),
+ 140 │     });
+ 141 │ >>>>>>> Stashed changes
+     · ───────
+ 142 │   } finally {
+ 143 │     await closeDb(db);
+ 143 │   }
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/api/jobs/[jobID]/loss/route.ts

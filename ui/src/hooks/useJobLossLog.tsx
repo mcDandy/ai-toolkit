@@ -16,6 +16,11 @@ type SeriesMap = Record<string, LossSeries>;
 interface LossResponse {
   keys?: string[];
   since_step?: number;
+  // resume detection (see the loss route): wall_time of since_step now, and of
+  // the newest step in this response
+  since_wall_time?: number | null;
+  last_step?: number | null;
+  last_wall_time?: number | null;
   series?: Record<string, { steps: number[]; values: (number | null)[] }>;
 }
 
@@ -31,6 +36,9 @@ export default function useJobLossLog(jobID: string, reloadInterval: null | numb
   // key logged at that step after the previous poll is still picked up; the
   // per-key merge below drops the one re-sent point.
   const lastStepRef = useRef<number | null>(null);
+  // wall_time of lastStepRef's step. A resume from an earlier checkpoint drops
+  // and re-logs steps, which changes it (or removes the step): then reload.
+  const lastWallRef = useRef<number | null>(null);
 
   const lossKeys = useMemo(() => {
     const base = keys ?? [];
@@ -54,14 +62,21 @@ export default function useJobLossLog(jobID: string, reloadInterval: null | numb
       if (reloadInterval && didInitialLoadRef.current && lastStepRef.current != null) {
         params.since_step = lastStepRef.current;
       }
-      const res = await apiClient.get(`/api/jobs/${jobID}/loss`, { params });
-      const data = res.data as LossResponse;
+      let res = await apiClient.get(`/api/jobs/${jobID}/loss`, { params });
+      let data = res.data as LossResponse;
+      let reload = false;
+      if (params.since_step != null && lastWallRef.current != null && data.since_wall_time !== lastWallRef.current) {
+        // our tail is stale (job resumed from an earlier checkpoint): start over
+        res = await apiClient.get(`/api/jobs/${jobID}/loss`);
+        data = res.data as LossResponse;
+        reload = true;
+      }
 
       const newKeys = data.keys ?? [];
       setKeys(newKeys);
       const wantedLossKeys = (newKeys.length ? [...newKeys] : ['loss']).sort();
       const incoming = data.series ?? {};
-      const initial = !didInitialLoadRef.current;
+      const initial = !didInitialLoadRef.current || reload;
 
       setSeries(prev => {
         const next: SeriesMap = initial ? {} : { ...prev };
@@ -103,6 +118,9 @@ export default function useJobLossLog(jobID: string, reloadInterval: null | numb
         }
 
         lastStepRef.current = maxStep;
+        // only trust the wall time if it belongs to the step we will poll from
+        lastWallRef.current =
+          data.last_step != null && data.last_step === maxStep ? (data.last_wall_time ?? null) : null;
         return next;
       });
 
@@ -142,6 +160,7 @@ export default function useJobLossLog(jobID: string, reloadInterval: null | numb
         // Re-anchor incremental polling to the new tail so a deleted tail
         // isn't treated as already-fetched.
         lastStepRef.current = last;
+        lastWallRef.current = null;
         return next;
       });
     },
@@ -153,6 +172,7 @@ export default function useJobLossLog(jobID: string, reloadInterval: null | numb
   useEffect(() => {
     didInitialLoadRef.current = false;
     lastStepRef.current = null;
+    lastWallRef.current = null;
     setSeries({});
     setKeys([]);
     setStatus('idle');

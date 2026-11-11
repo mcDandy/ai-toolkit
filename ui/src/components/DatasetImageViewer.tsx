@@ -10,7 +10,16 @@ import { apiClient } from '@/utils/api';
 import { isVideo, isAudio, encodeFilePathForUrl } from '@/utils/basic';
 import AudioPlayer from './AudioPlayer';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { BoundingBoxEditor, parseBoundingBoxes, extractBoxes } from './BoundingBoxOverlay';
+import {
+  BoundingBoxEditor,
+  parseBoundingBoxes,
+  extractBoxes,
+  captionElements,
+  setElementBox,
+  newBoxElement,
+  isLayoutCaption,
+  ImageDims,
+} from './BoundingBoxOverlay';
 import IdeogramCaptionSidebar, { isIdeogramCaption } from './IdeogramCaptionSidebar';
 import datasetTemplates from '@/helpers/datasetTemplates';
 
@@ -53,6 +62,11 @@ export default function DatasetImageViewer({
   const captionAbortRef = useRef<AbortController | null>(null);
 
   const isIdeogram = useMemo(() => isIdeogramCaption(caption), [caption]);
+  // any caption with a box layout (Ideogram or MOSS-Image), for the box overlay
+  const isLayout = useMemo(() => isLayoutCaption(caption), [caption]);
+  // natural pixel size of the shown image: MOSS boxes are in absolute pixels
+  const [imgDims, setImgDims] = useState<ImageDims | undefined>(undefined);
+  useEffect(() => setImgDims(undefined), [imgPath]);
 
   useEffect(() => setMounted(true), []);
 
@@ -62,10 +76,10 @@ export default function DatasetImageViewer({
     setIsDrawing(false);
   }, [imgPath]);
 
-  // Default to showing the editable boxes when an Ideogram caption is present.
+  // Default to showing the editable boxes when a layout caption is present.
   useEffect(() => {
-    setShowBoxes(isIdeogram);
-  }, [isIdeogram, imgPath]);
+    setShowBoxes(isLayout);
+  }, [isLayout, imgPath]);
 
   // open/close based on external value
   useEffect(() => {
@@ -250,8 +264,8 @@ export default function DatasetImageViewer({
       } catch {
         return undefined;
       }
-      const elements = data?.compositional_deconstruction?.elements;
-      if (!Array.isArray(elements)) return undefined;
+      const elements = captionElements(data);
+      if (!elements) return undefined;
       const result = fn(elements, data);
       setCaption(JSON.stringify(data, null, 2));
       return result;
@@ -261,11 +275,11 @@ export default function DatasetImageViewer({
 
   const handleBoxChange = useCallback(
     (elementIndex: number, box: { y1: number; x1: number; y2: number; x2: number }) => {
-      editCaption(els => {
-        if (els[elementIndex]) els[elementIndex].bbox = [box.y1, box.x1, box.y2, box.x2];
+      editCaption((els, data) => {
+        if (els[elementIndex]) setElementBox(data, els[elementIndex], box, imgDims);
       });
     },
-    [editCaption],
+    [editCaption, imgDims],
   );
 
   const handleDeleteBox = useCallback(
@@ -280,14 +294,16 @@ export default function DatasetImageViewer({
 
   const handleCreateBox = useCallback(
     (box: { y1: number; x1: number; y2: number; x2: number }) => {
-      const newIndex = editCaption(els => {
-        els.push({ type: 'obj', bbox: [box.y1, box.x1, box.y2, box.x2], desc: '' });
+      const newIndex = editCaption((els, data) => {
+        const el = newBoxElement(data, box, imgDims);
+        if (!el) return null;
+        els.push(el);
         return els.length - 1;
       });
       setSelectedBoxIndex(typeof newIndex === 'number' ? newIndex : null);
       setIsDrawing(false);
     },
-    [editCaption],
+    [editCaption, imgDims],
   );
 
   // keyboard events while open — skip nav while caption textarea is focused
@@ -383,11 +399,11 @@ export default function DatasetImageViewer({
   };
 
   const isCaptionCurrent = caption.trim() === savedCaption.trim();
-  const boundingBoxes = useMemo(() => parseBoundingBoxes(caption), [caption]);
+  const boundingBoxes = useMemo(() => parseBoundingBoxes(caption, imgDims), [caption, imgDims]);
   const canShowBoxes = Boolean(boundingBoxes && imgPath && !isAudio(imgPath) && !isVideo(imgPath));
 
   // Boxes are derived from the (locally edited) caption for the image overlay.
-  const editBoxes = useMemo(() => extractBoxes(safeParse(caption)), [caption]);
+  const editBoxes = useMemo(() => extractBoxes(safeParse(caption), imgDims), [caption, imgDims]);
 
   if (!mounted) return null;
 
@@ -441,6 +457,9 @@ export default function DatasetImageViewer({
                           src={`/api/img/${encodeFilePathForUrl(imgPath)}`}
                           alt="Dataset Image"
                           draggable={false}
+                          onLoad={e =>
+                            setImgDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+                          }
                           className="w-auto h-auto max-w-full max-h-[50vh] sm:max-h-[90vh] object-contain select-none !pointer-events-auto"
                         />
                         {showBoxes && (

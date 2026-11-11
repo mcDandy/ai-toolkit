@@ -84,14 +84,40 @@ export async function GET(request: NextRequest, { params }: { params: { jobID: s
     const keysRows = await all<{ key: string }>(db, `SELECT key FROM metric_keys ORDER BY key ASC`);
     const keys = keysRows.map((r) => r.key);
 
+    // ?keys=a,b,c: only these series (the Insights tab needs a handful of the
+    // many logged keys). `keys` in the response still lists every key.
+    const onlyParam = url.searchParams.get('keys');
+    const only = onlyParam ? new Set(onlyParam.split(',').filter(Boolean)) : null;
+
     const parts: string[] = [];
+    let maxStep: number | null = null;
     for (const key of keys) {
+      if (only && !only.has(key)) continue;
       const rows = await all<{ steps: string; vals: string }>(db, SERIES_SQL, [key, sinceStep]);
       const steps = rows[0]?.steps ?? '[]';
       const vals = rows[0]?.vals ?? '[]';
       parts.push(`${JSON.stringify(key)}:{"steps":${steps},"values":${vals}}`);
     }
-    body = `{"keys":${JSON.stringify(keys)},"since_step":${sinceStep},"series":{${parts.join(',')}}}`;
+    const maxRow = await all<{ m: number | null }>(db, `SELECT MAX(step) AS m FROM steps`);
+    maxStep = maxRow[0]?.m ?? null;
+
+    // When a run resumes from an earlier checkpoint the logger drops every step
+    // after it and logs them again. A polling client holds the wall_time of the
+    // step it polls from (last_wall_time of its previous response) and compares
+    // it with since_wall_time: different (or null, step gone) = its tail is
+    // stale and it reloads from scratch.
+    const wallTimeOf = async (step: number | null) => {
+      if (step == null) return null;
+      const r = await all<{ wall_time: number }>(db, `SELECT wall_time FROM steps WHERE step = ?`, [step]);
+      return r.length ? r[0].wall_time : null;
+    };
+    const sinceWallTime = sinceStep > 0 ? await wallTimeOf(sinceStep) : null;
+    const lastWallTime = await wallTimeOf(maxStep);
+
+    body =
+      `{"keys":${JSON.stringify(keys)},"since_step":${sinceStep},` +
+      `"since_wall_time":${JSON.stringify(sinceWallTime)},"last_step":${JSON.stringify(maxStep)},` +
+      `"last_wall_time":${JSON.stringify(lastWallTime)},"series":{${parts.join(',')}}}`;
   } finally {
     await closeDb(db);
   }
@@ -157,6 +183,15 @@ export async function DELETE(request: NextRequest, { params }: { params: { jobID
       // delete metrics explicitly rather than relying on it.
       await run(db, `DELETE FROM metrics WHERE step >= ? AND step <= ?;`, [minStep, maxStep]);
       await run(db, `DELETE FROM steps WHERE step >= ? AND step <= ?;`, [minStep, maxStep]);
+      // per-file losses (live_learning_monitor) live in the same db; without this
+      // the trained-image strip and per-file table keep showing the deleted steps
+      const hasFileLosses = await all<{ name: string }>(
+        db,
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='file_losses'`,
+      );
+      if (hasFileLosses.length > 0) {
+        await run(db, `DELETE FROM file_losses WHERE step >= ? AND step <= ?;`, [minStep, maxStep]);
+      }
       await run(
         db,
         `DELETE FROM metric_keys WHERE NOT EXISTS (SELECT 1 FROM metrics WHERE metrics.key = metric_keys.key);`
