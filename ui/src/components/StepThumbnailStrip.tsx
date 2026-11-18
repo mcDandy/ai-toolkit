@@ -12,7 +12,7 @@ interface Props {
   hoveredStep: number | null;
 }
 
-const ITEM_WIDTH = 72; // px, includes gap ÔÇö thumbnail box is sized to match
+const ITEM_WIDTH = 72; // px, includes gap — thumbnail box is sized to match
 const THUMB_SIZE = 64;
 const RENDER_BUFFER = 6; // extra items rendered past each edge of the viewport
 const RETURN_TO_END_DELAY_MS = 2200;
@@ -21,7 +21,7 @@ function basename(p: string) {
   return p.replace(/^.*[\\/]/, '');
 }
 
-// items are sorted ascending by step (the API guarantees this) ÔÇö binary
+// items are sorted ascending by step (the API guarantees this) — binary
 // search for the closest one to `target` instead of a linear scan.
 function findNearestIndex(items: StepThumbnail[], target: number): number {
   if (items.length === 0) return -1;
@@ -77,7 +77,7 @@ export default function StepThumbnailStrip({ job, hoveredStep }: Props) {
   }, []);
 
   // Reads scrollWidth/clientWidth live from the DOM rather than closing over
-  // `maxScroll`, so this callback's identity never changes ÔÇö otherwise, new
+  // `maxScroll`, so this callback's identity never changes — otherwise, new
   // steps arriving during active training would keep changing `maxScroll`
   // (and therefore this function) and endlessly reset the return-to-end
   // timer below, which depends on it.
@@ -103,7 +103,7 @@ export default function StepThumbnailStrip({ job, hoveredStep }: Props) {
   }, [items, hoveredStep]);
 
   // hover tracking: center the hovered step instantly (tied directly to
-  // mouse position ÔÇö a smooth-scroll here would lag behind the cursor).
+  // mouse position — a smooth-scroll here would lag behind the cursor).
   // Clamped to [0, maxScroll], so a step near the end just shows the tail
   // fully rather than centering with blank space past it.
   useEffect(() => {
@@ -182,7 +182,7 @@ export default function StepThumbnailStrip({ job, hoveredStep }: Props) {
                   key={`${item.step}-${item.file_path}`}
                   className="absolute top-2"
                   style={{ left: idx * ITEM_WIDTH, width: THUMB_SIZE }}
-                  title={`step ${item.step} ÔÇö ${basename(item.file_path)}`}
+                  title={`step ${item.step} — ${basename(item.file_path)}`}
                 >
                   <div
                     className={

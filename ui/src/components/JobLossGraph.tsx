@@ -165,7 +165,7 @@ export default function JobLossGraph({ job }: Props) {
   const [isZoomed, setIsZoomed] = useState(false);
 
   // step currently under the cursor on the chart, or null when the mouse
-  // isn't over it ÔÇö drives the trained-image strip below the graph.
+  // isn't over it — drives the trained-image strip below the graph.
   const [hoveredStep, setHoveredStep] = useState<number | null>(null);
 
   // Gate persistence writes until we've loaded any stored settings, so the

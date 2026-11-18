@@ -47,13 +47,13 @@ interface FileLossSummaryRow {
 }
 
 // A file needs at least this many logged steps before its regression line
-// (and therefore its score/category) is trusted rather than left null ÔÇö
+// (and therefore its score/category) is trusted rather than left null —
 // below this, a "trend" is mostly noise.
 const MIN_POINTS_FOR_FIT = 4;
 
 // A score smaller than this (as a fraction of the file's average loss)
 // counts as "flat" rather than improving/worsening, for category purposes
-// only ÔÇö the numeric score itself is never clamped to zero.
+// only — the numeric score itself is never clamped to zero.
 const FLAT_THRESHOLD = 0.05;
 
 interface Fit {
@@ -106,7 +106,7 @@ type Category = 'learning' | 'worsening' | 'stuck' | 'exhausted';
 // Secondary, informational-only label. Slope says whether it's moving;
 // comparing this file's average loss to the job-wide average says whether
 // "not moving" means it already learned it (exhausted) or never started
-// (stuck) ÔÇö slope alone can't tell those apart.
+// (stuck) — slope alone can't tell those apart.
 function computeCategory(score: number | null, avgLoss: number | null, jobAvgLoss: number | null): Category | null {
   if (score === null || avgLoss === null || jobAvgLoss === null) return null;
   if (score > FLAT_THRESHOLD) return 'learning';
@@ -222,7 +222,7 @@ export async function GET(request: NextRequest, { params }: { params: { jobID: s
 
     // Summary mode: aggregate stats per file, computed from the raw per-step
     // rows. sum_x/sum_y/sum_xy/sum_xx are the plain sums a closed-form OLS
-    // regression needs ÔÇö cheaper to compute here as aggregates than to pull
+    // regression needs — cheaper to compute here as aggregates than to pull
     // every row back and fit client-side.
     const rows = await all<FileLossSummaryRow>(
       db,
@@ -254,7 +254,7 @@ export async function GET(request: NextRequest, { params }: { params: { jobID: s
     );
 
     // job-wide average loss, used only to tell "flat and already low"
-    // (exhausted) apart from "flat and still high" (stuck) ÔÇö a fit's slope
+    // (exhausted) apart from "flat and still high" (stuck) — a fit's slope
     // alone can't distinguish those two.
     const withAvg = rows.filter(r => r.avg_loss !== null);
     const jobAvgLoss =

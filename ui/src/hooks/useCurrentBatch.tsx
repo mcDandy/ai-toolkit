@@ -10,7 +10,7 @@ export interface CurrentBatchItem {
   width: number;
   height: number;
   // resolution this file is actually being cropped/resized to for training
-  // (post-bucketing) ÔÇö can differ from the source width/height above.
+  // (post-bucketing) — can differ from the source width/height above.
   train_width: number;
   train_height: number;
   is_reg: boolean;

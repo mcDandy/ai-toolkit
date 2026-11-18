@@ -16,7 +16,7 @@ export interface FileLossRow {
   // as a fraction of this file's average loss; null until it has enough
   // history. Positive = improving.
   score: number | null;
-  // secondary, informational label derived from the same fit ÔÇö not used for
+  // secondary, informational label derived from the same fit — not used for
   // sort/color, just a hint at why the score looks the way it does.
   category: 'learning' | 'worsening' | 'stuck' | 'exhausted' | null;
   // average noise-adjusted loss: 1.0 = as hard as a typical sample at the same

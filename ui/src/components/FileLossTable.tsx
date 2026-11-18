@@ -47,22 +47,22 @@ function basename(p: string) {
 }
 
 function fmt(v: number | null) {
-  if (v === null || !Number.isFinite(v)) return 'ÔÇö';
+  if (v === null || !Number.isFinite(v)) return '—';
   return v.toPrecision(4);
 }
 
 function fmtStep(v: number | null) {
-  if (v === null || !Number.isFinite(v)) return 'ÔÇö';
+  if (v === null || !Number.isFinite(v)) return '—';
   return v.toLocaleString();
 }
 
 function fmtScore(v: number | null) {
-  if (v === null || !Number.isFinite(v)) return 'ÔÇö';
+  if (v === null || !Number.isFinite(v)) return '—';
   const pct = v * 100;
   return `${pct > 0 ? '+' : ''}${pct.toFixed(0)}%`;
 }
 
-// Secondary hint shown under the score ÔÇö not sorted/colored on its own.
+// Secondary hint shown under the score — not sorted/colored on its own.
 const CATEGORY_LABEL: Record<string, string> = {
   learning: 'learning',
   worsening: 'worsening',
@@ -86,7 +86,7 @@ export default function FileLossTable({ job }: Props) {
   const [adjustedPref, setAdjustedPref] = useState(true);
   const { rows, status, refresh, hasAdjusted } = useJobFileLoss(job.id, 10000, adjustedPref);
   const adjusted = adjustedPref && hasAdjusted;
-  // default: worst learning score first (score ascending) ÔÇö surfaces files
+  // default: worst learning score first (score ascending) — surfaces files
   // that likely have a bad caption or are otherwise not being learned.
   const [sortKey, setSortKey] = useState<SortKey>('score');
   const [sortDesc, setSortDesc] = useState(false);
@@ -148,7 +148,7 @@ export default function FileLossTable({ job }: Props) {
       const av = a[sortKey];
       const bv = b[sortKey];
       // nulls (e.g. score with not enough history yet) always sort last,
-      // regardless of direction ÔÇö they're "unknown", not "worst".
+      // regardless of direction — they're "unknown", not "worst".
       if (av === null && bv === null) return 0;
       if (av === null) return 1;
       if (bv === null) return -1;
@@ -176,7 +176,7 @@ export default function FileLossTable({ job }: Props) {
       title={title}
     >
       {label}
-      {sortKey === sortKeyName && <span className="ml-1">{sortDesc ? 'Ôľ╝' : 'Ôľ▓'}</span>}
+      {sortKey === sortKeyName && <span className="ml-1">{sortDesc ? '▼' : '▲'}</span>}
     </th>
   );
 

@@ -38,7 +38,7 @@ function BatchRow({
 }) {
   // Not ?thumb=1 on purpose: the pre-generated thumbnail is a sharp() resize
   // with `fit: 'cover'`, which center-crops to a square before it's ever
-  // saved to disk ÔÇö object-contain below can't recover image data that's
+  // saved to disk — object-contain below can't recover image data that's
   // already gone from the file. Only a handful of images are on screen here
   // at once (the current batch), so loading the originals is cheap.
   const src = `/api/img/${encodeURIComponent(item.path)}`;
@@ -46,7 +46,7 @@ function BatchRow({
 
   return (
     <div className="flex items-stretch gap-4 py-3 border-b border-gray-800/60 last:border-b-0">
-      {/* padded thumbnail ÔÇö object-contain so the full frame is always visible, never cropped */}
+      {/* padded thumbnail — object-contain so the full frame is always visible, never cropped */}
       <div className="relative w-40 h-40 shrink-0 bg-gray-950 rounded-lg border border-gray-800 flex items-center justify-center overflow-hidden">
         <button
           type="button"
@@ -118,7 +118,7 @@ function BatchRow({
 }
 
 export default function CurrentBatchViewer({ job }: Props) {
-  // current_batch.json is just a snapshot written by whatever step last ran ÔÇö
+  // current_batch.json is just a snapshot written by whatever step last ran —
   // it isn't cleared when training stops, so it goes stale rather than empty.
   // job.status is the authoritative "is this actually running right now"
   // signal (already on hand from aitk_db.db, no extra fetch), and unlike any
@@ -148,7 +148,7 @@ export default function CurrentBatchViewer({ job }: Props) {
   }, []);
 
   // fetch/refresh each visible file's loss trend whenever the training step
-  // advances. Keeps prior points on screen while refetching (no flicker) ÔÇö
+  // advances. Keeps prior points on screen while refetching (no flicker) —
   // only shows the loading spinner the first time a path is seen.
   useEffect(() => {
     if (!isTraining) return;

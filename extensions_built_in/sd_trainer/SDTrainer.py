@@ -1098,7 +1098,7 @@ class SDTrainer(BaseSDTrainProcess):
                 # add min_snr_gamma
                 loss = apply_snr_weight(loss, timesteps, self.sd.noise_scheduler, self.train_config.min_snr_gamma)
 
-        # loss is still per-sample here (one value per batch item) ÔÇö record it
+        # loss is still per-sample here (one value per batch item) — record it
         # against the file it came from before it gets reduced to a scalar
         # below. No-op unless an extension is listening for the
         # per_sample_loss event (see _log_per_file_loss above).

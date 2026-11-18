@@ -11,7 +11,7 @@ interface Props {
   height?: number;
 }
 
-// Light causal EMA purely to make the shape readable ÔÇö per-sample diffusion
+// Light causal EMA purely to make the shape readable — per-sample diffusion
 // loss is noisy enough step-to-step that a raw polyline is just static.
 function smooth(values: number[], alpha = 0.15): number[] {
   const out: number[] = [];
@@ -23,7 +23,7 @@ function smooth(values: number[], alpha = 0.15): number[] {
   return out;
 }
 
-// Ordinary least squares over (step, loss) ÔÇö same closed-form fit the
+// Ordinary least squares over (step, loss) — same closed-form fit the
 // per-file "score" in the table below is computed from, so the line drawn
 // here matches the number shown there.
 function linearFit(steps: number[], values: number[]): { slope: number; intercept: number } | null {
