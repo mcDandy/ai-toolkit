@@ -8,7 +8,7 @@ import {
   SampleTags,
 } from './options';
 import { useModelArchs } from '@/extensions/modelArchs';
-import { defaultCompileOptions, defaultDatasetConfig, defaultInsightsConfig } from './jobConfig';
+import { defaultCompileOptions, defaultDatasetConfig, defaultInsightsConfig, defaultWeightingConfig } from './jobConfig';
 
 const CLIP_INSIGHTS_MODEL = 'openai/clip-vit-base-patch32';
 import { GroupedSelectOption, JobConfig, SelectOption } from '@/types';
@@ -208,6 +208,7 @@ export default function SimpleJob({
   // absent block = trainer defaults (enabled)
   const insightsConfig = jobConfig.config.process[0].insights ?? {};
   const insightsEmbeddingModel = insightsConfig.embedding_model ?? 'latent';
+  const weightingConfig = jobConfig.config.process[0].weighting ?? {};
 
   let numDatasetCols = 4;
   let numSampleTopCols = 4;
@@ -1322,6 +1323,202 @@ export default function SimpleJob({
                     placeholder="eg. https://ntfy.sh/my-training-topic"
                   />
                 </div>
+              </div>
+            </Card>
+          )}
+          {!isLlmModel && (
+            <Card
+              title="Adaptive Weighting"
+              toggled={weightingConfig.enabled === true}
+              onToggle={value =>
+                setJobConfig(
+                  value
+                    ? { ...defaultWeightingConfig, ...weightingConfig, enabled: true }
+                    : { ...weightingConfig, enabled: false },
+                  'config.process[0].weighting',
+                )
+              }
+            >
+              <p className="text-sm text-gray-400 mb-4">
+                Scales each image&apos;s loss by how hard it actually is: images the model has already learned are
+                turned down so they stop overcooking, hard-but-improving images get a proportional boost, and images
+                that stay hard without ever improving (usually a caption problem) are throttled harder the longer they
+                stay stuck. The Live Batch tab&apos;s Weight column shows what each file is currently getting.
+              </p>
+              {/* easy policy */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                  <label className="invisible block text-xs mb-1 mt-2">.</label>
+                  <Checkbox
+                    label="Turn Down Easy"
+                    docKey="weighting.easy"
+                    className="pt-[3px]"
+                    checked={weightingConfig.easy !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.easy')}
+                  />
+                </div>
+                <NumberInput
+                  label="Easy Below"
+                  docKey="weighting.easy_threshold"
+                  value={weightingConfig.easy_threshold ?? defaultWeightingConfig.easy_threshold!}
+                  onChange={value =>
+                    setJobConfig(
+                      value ?? defaultWeightingConfig.easy_threshold,
+                      'config.process[0].weighting.easy_threshold',
+                    )
+                  }
+                  placeholder="eg. 0.6"
+                  min={0}
+                />
+                <NumberInput
+                  label="Min Weight"
+                  docKey="weighting.easy_weight"
+                  value={weightingConfig.easy_weight ?? defaultWeightingConfig.easy_weight!}
+                  onChange={value =>
+                    setJobConfig(value ?? defaultWeightingConfig.easy_weight, 'config.process[0].weighting.easy_weight')
+                  }
+                  placeholder="eg. 0.5"
+                  min={0}
+                  max={1}
+                />
+                <div>
+                  <label className="invisible block text-xs mb-1 mt-2">.</label>
+                  <Checkbox
+                    label="Proportional"
+                    docKey="weighting.easy_progressive"
+                    className="pt-[3px]"
+                    checked={weightingConfig.easy_progressive !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.easy_progressive')}
+                  />
+                </div>
+              </div>
+              {/* hard-but-improving policy */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+                <div>
+                  <label className="invisible block text-xs mb-1 mt-2">.</label>
+                  <Checkbox
+                    label="Boost Hard"
+                    docKey="weighting.boost"
+                    className="pt-[3px]"
+                    checked={weightingConfig.boost !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.boost')}
+                  />
+                </div>
+                <NumberInput
+                  label="Hard Above"
+                  docKey="weighting.hard_threshold"
+                  value={weightingConfig.hard_threshold ?? defaultWeightingConfig.hard_threshold!}
+                  onChange={value =>
+                    setJobConfig(
+                      value ?? defaultWeightingConfig.hard_threshold,
+                      'config.process[0].weighting.hard_threshold',
+                    )
+                  }
+                  placeholder="eg. 1.2"
+                  min={1}
+                />
+                <NumberInput
+                  label="Max Weight"
+                  docKey="weighting.max_boost"
+                  value={weightingConfig.max_boost ?? defaultWeightingConfig.max_boost!}
+                  onChange={value =>
+                    setJobConfig(value ?? defaultWeightingConfig.max_boost, 'config.process[0].weighting.max_boost')
+                  }
+                  placeholder="eg. 1.5"
+                  min={1}
+                />
+                <div>
+                  <label className="invisible block text-xs mb-1 mt-2">.</label>
+                  <Checkbox
+                    label="Proportional"
+                    docKey="weighting.boost_progressive"
+                    className="pt-[3px]"
+                    checked={weightingConfig.boost_progressive !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.boost_progressive')}
+                  />
+                </div>
+              </div>
+              {/* stuck policy */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+                <div>
+                  <label className="invisible block text-xs mb-1 mt-2">.</label>
+                  <Checkbox
+                    label="Throttle Stuck"
+                    docKey="weighting.stuck"
+                    className="pt-[3px]"
+                    checked={weightingConfig.stuck !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.stuck')}
+                  />
+                </div>
+                <NumberInput
+                  label="Stuck Windows"
+                  docKey="weighting.stuck_windows"
+                  value={weightingConfig.stuck_windows ?? defaultWeightingConfig.stuck_windows!}
+                  onChange={value =>
+                    setJobConfig(
+                      value ?? defaultWeightingConfig.stuck_windows,
+                      'config.process[0].weighting.stuck_windows',
+                    )
+                  }
+                  placeholder="eg. 2"
+                  min={1}
+                />
+                <NumberInput
+                  label="Stuck Weight"
+                  docKey="weighting.stuck_weight"
+                  value={weightingConfig.stuck_weight ?? defaultWeightingConfig.stuck_weight!}
+                  onChange={value =>
+                    setJobConfig(
+                      value ?? defaultWeightingConfig.stuck_weight,
+                      'config.process[0].weighting.stuck_weight',
+                    )
+                  }
+                  placeholder="eg. 0.6"
+                  min={0}
+                  max={1}
+                />
+                <div>
+                  <label className="invisible block text-xs mb-1 mt-2">.</label>
+                  <Checkbox
+                    label="Cumulative"
+                    docKey="weighting.stuck_progressive"
+                    className="pt-[3px]"
+                    checked={weightingConfig.stuck_progressive !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.stuck_progressive')}
+                  />
+                </div>
+              </div>
+              {/* shared settings */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+                <NumberInput
+                  label="Window (steps)"
+                  docKey="weighting.window"
+                  value={weightingConfig.window ?? null}
+                  onChange={value => setJobConfig(value || null, 'config.process[0].weighting.window')}
+                  placeholder="auto: one epoch"
+                  min={1}
+                  allowEmpty
+                />
+                <NumberInput
+                  label="Min Samples"
+                  docKey="weighting.min_samples"
+                  value={weightingConfig.min_samples ?? defaultWeightingConfig.min_samples!}
+                  onChange={value =>
+                    setJobConfig(value ?? defaultWeightingConfig.min_samples, 'config.process[0].weighting.min_samples')
+                  }
+                  placeholder="eg. 8"
+                  min={1}
+                />
+                <NumberInput
+                  label="Boost Gain"
+                  docKey="weighting.boost_gain"
+                  value={weightingConfig.boost_gain ?? defaultWeightingConfig.boost_gain!}
+                  onChange={value =>
+                    setJobConfig(value ?? defaultWeightingConfig.boost_gain, 'config.process[0].weighting.boost_gain')
+                  }
+                  placeholder="eg. 0.5"
+                  min={0}
+                />
               </div>
             </Card>
           )}

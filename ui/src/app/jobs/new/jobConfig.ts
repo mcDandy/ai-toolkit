@@ -1,7 +1,7 @@
 'use client';
 import { isMac } from '@/helpers/basic';
 import { defaultSampleConfig } from '@/helpers/defaultSamples';
-import { JobConfig, SampleConfig, DatasetConfig, SliderConfig, InsightsConfig } from '@/types';
+import { JobConfig, SampleConfig, DatasetConfig, SliderConfig, InsightsConfig, WeightingConfig } from '@/types';
 
 export const defaultDatasetConfig: DatasetConfig = {
   folder_path: '/path/to/images/folder',
@@ -54,6 +54,27 @@ export const defaultInsightsConfig: InsightsConfig = {
   alert_cooldown: 500,
   concept_prompt: null,
   concept_neutral: 'a photo',
+};
+
+export const defaultWeightingConfig: WeightingConfig = {
+  enabled: false,
+  easy: true,
+  boost: true,
+  stuck: true,
+  easy_weight: 0.5,
+  max_boost: 1.5,
+  boost_gain: 0.5,
+  stuck_weight: 0.6,
+  min_weight: 0.1,
+  easy_progressive: true,
+  boost_progressive: true,
+  stuck_progressive: true,
+  easy_threshold: 0.6,
+  hard_threshold: 1.2,
+  improve_eps: 0.05,
+  stuck_windows: 2,
+  min_samples: 8,
+  window: null,
 };
 
 export const defaultCompileOptions = {
@@ -129,6 +150,7 @@ export const defaultJobConfig: JobConfig = {
           use_ui_logger: true,
         },
         insights: defaultInsightsConfig,
+        weighting: defaultWeightingConfig,
         model: {
           name_or_path: 'ostris/Flex.1-alpha',
           quantize: true,

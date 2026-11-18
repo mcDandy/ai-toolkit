@@ -342,6 +342,145 @@ const docs: { [key: string]: ConfigDoc } = {
       </>
     ),
   },
+  'weighting.easy': {
+    title: 'Turn Down Easy',
+    description: (
+      <>
+        Images whose average noise-adjusted loss sits below the Easy Below threshold are considered learned and get
+        their loss scaled toward Min Weight, so they stop being overtrained while the rest of the dataset catches up.
+      </>
+    ),
+  },
+  'weighting.boost': {
+    title: 'Boost Hard',
+    description: (
+      <>
+        Images above the Hard Above threshold whose difficulty is still dropping get their loss multiplied by up to Max
+        Boost (proportional to how hard they are), so the model spends relatively more effort on what it has not
+        learned yet but is making progress on.
+      </>
+    ),
+  },
+  'weighting.stuck': {
+    title: 'Throttle Stuck',
+    description: (
+      <>
+        Images above the Hard Above threshold that show no improvement for Stuck Windows evaluation windows in a row
+        are usually mislabelled or broken. Their weight is cut by Stuck Weight for each further stuck window (down to
+        Min Weight) so a bad caption stops poisoning the rest of training.
+      </>
+    ),
+  },
+  'weighting.window': {
+    title: 'Window',
+    description: (
+      <>
+        Training steps between re-evaluations of every image&apos;s difficulty (the same unit as the job&apos;s Steps
+        setting). Left empty it is estimated as roughly one pass over the dataset. Shorter reacts faster but needs
+        Min Samples per image inside each window to say anything reliable.
+      </>
+    ),
+  },
+  'weighting.easy_weight': {
+    title: 'Min Weight',
+    description: (
+      <>
+        The loss multiplier a fully-learned image is turned down to. Images ramp between this and ×1 as their
+        difficulty approaches the Easy Below threshold. 0.5 = an already-learned image contributes half its usual
+        gradient.
+      </>
+    ),
+  },
+  'weighting.easy_threshold': {
+    title: 'Easy Below',
+    description: (
+      <>
+        Average noise-adjusted loss (1.0 = as hard as a typical sample at the same timestep) at or below which an
+        image counts as learned. Lower it to only down-weight clearly memorised images.
+      </>
+    ),
+  },
+  'weighting.hard_threshold': {
+    title: 'Hard Above',
+    description: (
+      <>
+        Average noise-adjusted loss at or above which an image counts as hard, making it eligible for the boost (if
+        improving) or the stuck throttle (if not).
+      </>
+    ),
+  },
+  'weighting.max_boost': {
+    title: 'Max Weight',
+    description: <>Ceiling for the hard-but-improving multiplier. 1.5 means a hard image contributes at most 1.5× its usual gradient.</>,
+  },
+  'weighting.boost_gain': {
+    title: 'Boost Gain',
+    description: (
+      <>
+        How steeply the boost grows with difficulty: multiplier = 1 + gain × (difficulty − 1), capped at Max Weight.
+        With gain 0.5, an image twice as hard as typical gets ×1.5.
+      </>
+    ),
+  },
+  'weighting.stuck_weight': {
+    title: 'Stuck Weight',
+    description: (
+      <>
+        The throttle applied per consecutive stuck window: after the first stuck windows, weight = stuck weight ^ n, so
+        it shrinks harder the longer the image refuses to improve. 0.6 gives ×0.60, ×0.36, ×0.22, ... With Cumulative
+        off this is instead the fixed weight a stuck image keeps (×0.6 forever).
+      </>
+    ),
+  },
+  'weighting.stuck_windows': {
+    title: 'Stuck Windows',
+    description: (
+      <>
+        How many consecutive evaluation windows without improvement before the throttle starts. Higher gives a
+        slow-improving image more chances before being treated as stuck.
+      </>
+    ),
+  },
+  'weighting.min_samples': {
+    title: 'Min Samples',
+    description: (
+      <>
+        How many times an image must be trained inside one window before it is classified at all — below this its
+        previous weight is kept. Only relevant for very small datasets or very short windows.
+      </>
+    ),
+  },
+  'weighting.easy_progressive': {
+    title: 'Proportional (Easy)',
+    description: (
+      <>
+        On (default): the weight is proportional to how easy the image is (ramping between Min Weight when fully
+        learned and ×1 at the Easy Below threshold) and escalates the longer it stays easy — the window&apos;s value
+        compounds with each consecutive easy window, down to Min Weight, so a permanently memorised image gradually
+        fades out. Off: every easy image gets exactly Min Weight.
+      </>
+    ),
+  },
+  'weighting.boost_progressive': {
+    title: 'Proportional (Hard)',
+    description: (
+      <>
+        On (default): the boost is proportional to how hard the image is (1 + Boost Gain × (difficulty − 1)) and
+        escalates the longer it keeps improving — the boost compounds with each consecutive improving window, capped
+        at Max Weight. Off: every hard-but-improving image gets exactly Max Weight.
+      </>
+    ),
+  },
+  'weighting.stuck_progressive': {
+    title: 'Cumulative',
+    description: (
+      <>
+        On (default): the stuck throttle deepens with every additional window without improvement (Stuck Weight ^ n),
+        so a hopeless image fades out. Off: a stuck image simply drops to Stuck Weight and stays there — it is turned
+        down but keeps training at a fixed reduced weight.
+      </>
+    ),
+  },
   'insights.every': {
     title: 'Measure Every',
     description: (

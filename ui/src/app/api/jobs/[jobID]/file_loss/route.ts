@@ -159,6 +159,19 @@ export async function GET(request: NextRequest, { params }: { params: { jobID: s
     return NextResponse.json(filePath ? { file_path: filePath, points: [] } : { rows: [] });
   };
 
+  // view=weighting: the adaptive_weighting extension's current per-file
+  // weights (written to <job folder>/weighting.json each window). Null when
+  // the feature has never run for this job. Served from the job folder, so it
+  // does not need the sqlite db at all.
+  if (url.searchParams.get('view') === 'weighting') {
+    try {
+      const raw = await fs.promises.readFile(path.join(jobFolder, 'weighting.json'), 'utf-8');
+      return NextResponse.json(JSON.parse(raw));
+    } catch {
+      return NextResponse.json(null);
+    }
+  }
+
   try {
     await fs.promises.access(logPath);
   } catch {
@@ -166,7 +179,6 @@ export async function GET(request: NextRequest, { params }: { params: { jobID: s
   }
 
   const db = openDb(logPath);
-
   try {
     const tableExists = await all<{ name: string }>(
       db,

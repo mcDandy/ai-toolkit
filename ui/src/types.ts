@@ -294,6 +294,29 @@ export interface InsightsConfig {
   concept_device?: string;
 }
 
+// adaptive_weighting extension: per-image training weights from measured
+// difficulty (see extensions/adaptive_weighting/hooks.py DEFAULTS)
+export interface WeightingConfig {
+  enabled?: boolean;
+  easy?: boolean;
+  boost?: boolean;
+  stuck?: boolean;
+  easy_weight?: number;
+  max_boost?: number;
+  boost_gain?: number;
+  stuck_weight?: number;
+  min_weight?: number;
+  easy_progressive?: boolean;
+  boost_progressive?: boolean;
+  stuck_progressive?: boolean;
+  easy_threshold?: number;
+  hard_threshold?: number;
+  improve_eps?: number;
+  stuck_windows?: number;
+  min_samples?: number;
+  window?: number | null;
+}
+
 export interface SliderConfig {
   guidance_strength?: number;
   anchor_strength?: number;
@@ -317,6 +340,7 @@ export interface ProcessConfig {
   train: TrainConfig;
   logging: LoggingConfig;
   insights?: InsightsConfig;
+  weighting?: WeightingConfig;
   model: ModelConfig;
   sample: SampleConfig;
 }

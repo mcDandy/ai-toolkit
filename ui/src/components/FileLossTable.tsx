@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback, Fragment, type CSSProperties } from 'react';
 import { Job } from '@prisma/client';
-import useJobFileLoss, { FileLossRow } from '@/hooks/useJobFileLoss';
+import useJobFileLoss, { useWeighting, FileLossRow, WeightingFile } from '@/hooks/useJobFileLoss';
 import { apiClient } from '@/utils/api';
 import { FaDownload, FaTrashAlt } from 'react-icons/fa';
 import { LuLoader, LuChevronDown, LuChevronRight } from 'react-icons/lu';
@@ -40,7 +40,9 @@ interface Props {
 
 type SeriesState = { status: 'loading' } | { status: 'error' } | { status: 'success'; points: LossSparklinePoint[] };
 
-type SortKey = 'avg_loss' | 'count' | 'last_loss' | 'last_step' | 'file_path' | 'score' | 'difficulty';
+type SortKey = 'avg_loss' | 'count' | 'last_loss' | 'last_step' | 'file_path' | 'score' | 'difficulty' | 'weight';
+
+type Row = FileLossRow & { weight: number | null };
 
 function basename(p: string) {
   return p.replace(/^.*[\\/]/, '');
@@ -80,11 +82,37 @@ function scoreRowStyle(v: number | null): CSSProperties | undefined {
   return { backgroundColor: `hsla(${hue}, 65%, 40%, 0.22)` };
 }
 
+// adaptive_weighting categories: what the extension is currently doing to
+// this file's loss, and how to tint its weight badge
+const WEIGHT_LABEL: Record<string, string> = {
+  easy: 'learned',
+  boost: 'boosting',
+  stuck: 'stuck',
+  hard: 'hard',
+  healthy: 'ok',
+  warming: 'warming up',
+};
+
+function weightBadgeStyle(category: string): CSSProperties {
+  const hue = category === 'boost' ? 145 : category === 'easy' ? 200 : category === 'stuck' ? 0 : category === 'hard' ? 30 : null;
+  return hue === null
+    ? { backgroundColor: 'rgba(107, 114, 128, 0.25)' }
+    : { backgroundColor: `hsla(${hue}, 65%, 45%, 0.28)` };
+}
+
+function weightTitle(w: WeightingFile): string {
+  const mean = w.last_mean != null ? w.last_mean.toFixed(2) : '—';
+  const stuck = w.stuck ? `, ${w.stuck} window${w.stuck > 1 ? 's' : ''} without improvement` : '';
+  return `${w.category}: window mean difficulty ${mean}${stuck}`;
+}
+
 export default function FileLossTable({ job }: Props) {
   // noise-adjusted by default: raw per-file loss mostly reflects which timestep
   // each file happened to be trained at. Falls back to raw on older data.
   const [adjustedPref, setAdjustedPref] = useState(true);
   const { rows, status, refresh, hasAdjusted } = useJobFileLoss(job.id, 10000, adjustedPref);
+  // adaptive weights currently applied by the adaptive_weighting extension
+  const { weighting } = useWeighting(job.id, 10000);
   const adjusted = adjustedPref && hasAdjusted;
   // default: worst learning score first (score ascending) — surfaces files
   // that likely have a bad caption or are otherwise not being learned.
@@ -142,8 +170,15 @@ export default function FileLossTable({ job }: Props) {
 
   const visibleRows = useMemo(() => rows.filter(r => !deletedPaths.has(r.file_path)), [rows, deletedPaths]);
 
+  // fold the current adaptive weight (if any) onto each row so it can be
+  // shown and sorted like the other columns
+  const mergedRows = useMemo<Row[]>(
+    () => visibleRows.map(r => ({ ...r, weight: weighting?.files[r.file_path]?.multiplier ?? null })),
+    [visibleRows, weighting],
+  );
+
   const sorted = useMemo(() => {
-    const copy = [...visibleRows];
+    const copy = [...mergedRows];
     copy.sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
@@ -158,7 +193,7 @@ export default function FileLossTable({ job }: Props) {
       return sortDesc ? (bv as number) - (av as number) : (av as number) - (bv as number);
     });
     return copy;
-  }, [visibleRows, sortKey, sortDesc]);
+  }, [mergedRows, sortKey, sortDesc]);
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -249,12 +284,17 @@ export default function FileLossTable({ job }: Props) {
                 <Header
                   label="Score"
                   sortKeyName="score"
-                  title="Predicted loss change from a best-fit line through this file's loss history (first step to last), as a percent of its average loss. Green = learning well, red = flat or getting worse (check the caption). The small label underneath is a secondary hint (learning / worsening / stuck / exhausted)."
+                  title="Predicted loss change from a best-fit line through this file's loss history (first step to last), as a percent of its average loss. Green = learning well, red = flat or getting worse (check the caption). The small label underneath is a secondary hint (learning / worsening / stuck / exhausted). This is a trend label over the whole run — the Weight column's label is separate and comes from the adaptive_weighting extension's recent window difficulty instead."
                 />
                 <Header
                   label="Difficulty"
                   sortKeyName="difficulty"
                   title="Average noise-adjusted loss: 1.0 = as hard as a typical sample at the same timestep. Well above 1 = hard for the model (often a caption problem or an outlier image). Well below 1 = easy, or memorised."
+                />
+                <Header
+                  label="Weight"
+                  sortKeyName="weight"
+                  title="Adaptive weight currently applied to this file's loss (adaptive_weighting extension): below ×1 = turned down (already learned, or stuck and not improving), above ×1 = boosted (hard but improving). Updates once per window."
                 />
                 <th
                   className="px-3 py-2 text-left whitespace-nowrap"
@@ -272,9 +312,10 @@ export default function FileLossTable({ job }: Props) {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((row: FileLossRow) => {
+              {sorted.map((row: Row) => {
                 const isExpanded = expandedPath === row.file_path;
                 const rowSeries = series[`${adjusted ? 'adj' : 'raw'}:${row.file_path}`];
+                const w = weighting?.files[row.file_path];
                 return (
                   <Fragment key={row.file_path}>
                     <tr
@@ -332,6 +373,18 @@ export default function FileLossTable({ job }: Props) {
                       >
                         {row.difficulty == null ? '—' : row.difficulty.toFixed(2)}
                       </td>
+                      <td className="px-3 py-1.5" title={w ? weightTitle(w) : undefined}>
+                        {w == null ? (
+                          <span className="text-gray-600">—</span>
+                        ) : (
+                          <div>
+                            <span className="px-1.5 py-0.5 rounded font-mono" style={weightBadgeStyle(w.category)}>
+                              ×{w.multiplier.toFixed(2)}
+                            </span>
+                            <div className="text-[10px] text-gray-500 mt-0.5">{WEIGHT_LABEL[w.category] ?? w.category}</div>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-3 py-1.5">
                         <BandBars bands={row.bands} />
                       </td>
@@ -362,7 +415,7 @@ export default function FileLossTable({ job }: Props) {
                     </tr>
                     {isExpanded && (
                       <tr className="border-b border-gray-800/60 bg-gray-950/60">
-                        <td colSpan={12} className="px-4 py-3">
+                        <td colSpan={13} className="px-4 py-3">
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <div className="text-[11px] text-gray-500 mb-1" title={row.file_path}>

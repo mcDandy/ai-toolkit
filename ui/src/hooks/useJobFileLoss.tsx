@@ -51,3 +51,37 @@ export default function useJobFileLoss(jobID: string, reloadInterval: number | n
 
   return { rows, status, refresh, hasAdjusted };
 }
+
+// one file's current adaptive weight, from <job folder>/weighting.json
+export interface WeightingFile {
+  category: 'easy' | 'boost' | 'stuck' | 'hard' | 'healthy' | 'warming' | string;
+  multiplier: number;
+  stuck?: number;
+  last_mean?: number | null;
+}
+
+export interface WeightingData {
+  updated_step: number;
+  window: number | null;
+  files: Record<string, WeightingFile>;
+}
+
+// the adaptive_weighting extension's live per-file weights; null until the
+// extension has completed its first window for this job
+export function useWeighting(jobID: string, reloadInterval: number | null = null) {
+  const [weighting, setWeighting] = useState<WeightingData | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!jobID) return;
+    try {
+      const res = await apiClient.get(`/api/jobs/${jobID}/file_loss`, { params: { view: 'weighting' } });
+      setWeighting(res.data && res.data.files ? (res.data as WeightingData) : null);
+    } catch (err) {
+      console.error('Error fetching weighting data:', err);
+    }
+  }, [jobID]);
+
+  usePollLoop(refresh, reloadInterval, [jobID]);
+
+  return { weighting, refresh };
+}
