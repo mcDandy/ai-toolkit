@@ -10,6 +10,7 @@ import torch.functional as F
 from safetensors.torch import load_file
 from torch.utils.data import DataLoader, ConcatDataset
 
+from toolkit import train_hooks
 from toolkit import train_tools
 from toolkit.basic import value_map, adain, get_mean_std
 from toolkit.clip_vision_adapter import ClipVisionAdapter
@@ -547,32 +548,20 @@ class SDTrainer(BaseSDTrainProcess):
             per_sample_loss: torch.Tensor,
             timesteps: Optional[torch.Tensor] = None,
     ):
-        # `log_file_loss` isn't part of the core logger interface ÔÇö it's added
-        # to UILogger at runtime by the optional extensions/live_learning_monitor
-        # package, if present, via a monkey-patch. Without it this returns right
-        # away. Kept as a method so extensions (training_insights) can wrap it to
-        # see the per-sample losses and timesteps too.
+        # Emit the per_sample_loss event so optional extensions
+        # (extensions/live_learning_monitor's per-file loss writer,
+        # extensions/training_insights) can observe each sample's loss and
+        # timestep before the loss is reduced. Nothing happens unless an
+        # extension is listening, and we skip the GPU sync in that case.
         #
         # per_sample_loss is expected to have one value per item in batch.file_items,
         # in the same order. If shapes don't line up (e.g. a loss path that combines
         # samples differently) just skip logging for this step rather than guess.
-        if not hasattr(self.logger, 'log_file_loss'):
+        if not train_hooks.has_listeners('per_sample_loss'):
             return
-        file_items = batch.file_items
-        if per_sample_loss.numel() != len(file_items):
+        if per_sample_loss.numel() != len(batch.file_items):
             return
-        values = per_sample_loss.detach().float().cpu().tolist()
-        # one timestep per sample (0..1000, higher = noisier), when it lines up
-        steps_t = [None] * len(values)
-        if timesteps is not None and timesteps.numel() == len(values):
-            steps_t = timesteps.detach().float().cpu().flatten().tolist()
-        for file_item, value, t in zip(file_items, values, steps_t):
-            self.logger.log_file_loss(
-                file_item.path, value, self.step_num, timestep=t,
-                # training resolution after bucketing, for difficulty per bucket
-                width=getattr(file_item, 'crop_width', None),
-                height=getattr(file_item, 'crop_height', None),
-            )
+        train_hooks.emit('per_sample_loss', self, batch, per_sample_loss, timesteps)
 
     # you can expand these in a child class to make customization easier
     def calculate_loss(
@@ -586,6 +575,13 @@ class SDTrainer(BaseSDTrainProcess):
             prior_pred: Union[torch.Tensor, None] = None,
             **kwargs
     ):
+        # snapshot the call args for the loss_calculated hook; the locals are
+        # rebound below (match_noise_norm, pred_scaler, target_noise_multiplier)
+        _loss_call_kwargs = dict(
+            noise_pred=noise_pred, noise=noise, noisy_latents=noisy_latents,
+            timesteps=timesteps, batch=batch, mask_multiplier=mask_multiplier,
+            prior_pred=prior_pred, extra_kwargs=kwargs,
+        )
         loss_target = self.train_config.loss_target
         is_reg = any(batch.get_is_reg_list())
         additional_loss = 0.0
@@ -1104,8 +1100,8 @@ class SDTrainer(BaseSDTrainProcess):
 
         # loss is still per-sample here (one value per batch item) ÔÇö record it
         # against the file it came from before it gets reduced to a scalar
-        # below. No-op unless something (see _log_per_file_loss above) has
-        # actually given the logger a log_file_loss method to call, or wraps it.
+        # below. No-op unless an extension is listening for the
+        # per_sample_loss event (see _log_per_file_loss above).
         self._log_per_file_loss(batch, loss, timesteps)
 
         loss = loss.mean()
@@ -1148,7 +1144,12 @@ class SDTrainer(BaseSDTrainProcess):
 
         if self.train_config.max_loss is not None:
             loss = torch.clamp(loss, max=self.train_config.max_loss)
-        
+
+        # let extensions (training_insights' caption probe) see the finished
+        # loss alongside the original call arguments
+        if train_hooks.has_listeners('loss_calculated'):
+            train_hooks.emit('loss_calculated', self, loss, _loss_call_kwargs)
+
         return loss
 
     def preprocess_batch(self, batch: 'DataLoaderBatchDTO'):
@@ -1462,7 +1463,7 @@ class SDTrainer(BaseSDTrainProcess):
         guidance_embedding_scale = self.train_config.cfg_scale
         if self.train_config.do_guidance_loss:
             guidance_embedding_scale = self._guidance_loss_target_batch
-        return self.sd.predict_noise(
+        pred = self.sd.predict_noise(
             latents=noisy_latents.to(self.device_torch, dtype=dtype),
             conditional_embeddings=conditional_embeds.to(self.device_torch, dtype=dtype),
             unconditional_embeddings=unconditional_embeds,
@@ -1475,6 +1476,17 @@ class SDTrainer(BaseSDTrainProcess):
             batch=batch,
             **kwargs
         )
+        # let extensions (training_insights' caption probe) see the training
+        # prediction; probe re-predictions pass is_primary_pred=False
+        if is_primary_pred and torch.is_grad_enabled():
+            train_hooks.emit(
+                'after_primary_pred', self, pred,
+                noisy_latents=noisy_latents, timesteps=timesteps,
+                conditional_embeds=conditional_embeds,
+                unconditional_embeds=unconditional_embeds,
+                batch=batch, extra_kwargs=kwargs,
+            )
+        return pred
     
 
     def train_llm_accumulation(self, batch: DataLoaderBatchDTO, accum_scale: float = 1.0):

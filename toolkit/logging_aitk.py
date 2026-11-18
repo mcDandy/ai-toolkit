@@ -2,6 +2,7 @@ from typing import OrderedDict, Optional
 from PIL import Image
 
 from toolkit.config_modules import LoggingConfig
+from toolkit import train_hooks
 import os
 import sqlite3
 import time
@@ -193,6 +194,9 @@ class UILogger:
         ):
             self._flush()
 
+        # let extensions mirror their own buffers at the same commit boundary
+        train_hooks.emit('log_commit', self, step)
+
     # log image
     def log_image(self, *args, **kwargs):
         # this doesnt log images for now
@@ -200,6 +204,8 @@ class UILogger:
 
     # finish logging
     def finish(self):
+        # before tearing down, so extensions can flush their own tables
+        train_hooks.emit('log_finish', self)
         if not self._started:
             return
 

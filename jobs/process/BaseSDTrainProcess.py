@@ -44,6 +44,7 @@ from toolkit.optimizer import get_optimizer
 from toolkit.paths import CONFIG_ROOT
 from toolkit.progress_bar import ToolkitProgressBar
 from toolkit.prompt_utils import concat_prompt_embeds
+from toolkit import train_hooks
 from toolkit.reference_adapter import ReferenceAdapter
 from toolkit.sampler import get_sampler
 from toolkit.saving import save_t2i_from_diffusers, load_t2i_model, save_ip_adapter_from_diffusers, \
@@ -385,6 +386,7 @@ class BaseSDTrainProcess(BaseTrainProcess):
 
         if self.ema is not None:
             self.ema.train()
+        train_hooks.emit('sample_end', self, step)
         print_acc("") # add a line break
 
     def update_training_metadata(self):
@@ -2684,7 +2686,9 @@ class BaseSDTrainProcess(BaseTrainProcess):
             loss_dict = None
             try:
                 with self.accelerator.accumulate(self.modules_being_trained):
+                    train_hooks.emit('batch_start', self, batch_list)
                     loss_dict = self.hook_train_loop(batch_list)
+                    train_hooks.emit('step_end', self, batch_list, loss_dict)
             except torch.cuda.OutOfMemoryError:
                 did_oom = True
             except RuntimeError as e:
