@@ -160,13 +160,73 @@ export async function GET(request: NextRequest, { params }: { params: { jobID: s
   };
 
   // view=weighting: the adaptive_weighting extension's current per-file
-  // weights (written to <job folder>/weighting.json each window). Null when
-  // the feature has never run for this job. Served from the job folder, so it
-  // does not need the sqlite db at all.
+  // weights, kept in the weighting_* tables inside loss_log.db. Null when
+  // the feature has never run for this job.
   if (url.searchParams.get('view') === 'weighting') {
+    interface WStateRow {
+      file_path: string;
+      category: string | null;
+      multiplier: number | null;
+      stuck: number | null;
+      easy_streak: number | null;
+      boost_streak: number | null;
+      last_mean: number | null;
+    }
     try {
-      const raw = await fs.promises.readFile(path.join(jobFolder, 'weighting.json'), 'utf-8');
-      return NextResponse.json(JSON.parse(raw));
+      await fs.promises.access(logPath);
+      const wdb = openDb(logPath);
+      try {
+        const hasTable = await all<{ name: string }>(
+          wdb,
+          `SELECT name FROM sqlite_master WHERE type='table' AND name='weighting_state'`,
+        );
+        if (hasTable.length === 0) return NextResponse.json(null);
+        const rows = await all<WStateRow>(
+          wdb,
+          `SELECT file_path, category, multiplier, stuck, easy_streak, boost_streak, last_mean
+           FROM weighting_state`,
+        );
+        if (rows.length === 0) return NextResponse.json(null);
+        const hist = await all<{ file_path: string; step: number; category: string; mult: number }>(
+          wdb,
+          `SELECT file_path, step, category, mult FROM weighting_history ORDER BY step`,
+        );
+        const meta = await all<{ key: string; value: string }>(wdb, `SELECT key, value FROM weighting_meta`);
+        const files: Record<
+          string,
+          {
+            category: string;
+            multiplier: number;
+            stuck: number;
+            easy_streak: number;
+            boost_streak: number;
+            last_mean: number | null;
+            history: [number, string, number][];
+          }
+        > = {};
+        for (const r of rows) {
+          files[r.file_path] = {
+            category: r.category ?? 'warming',
+            multiplier: r.multiplier ?? 1,
+            stuck: r.stuck ?? 0,
+            easy_streak: r.easy_streak ?? 0,
+            boost_streak: r.boost_streak ?? 0,
+            last_mean: r.last_mean,
+            history: [],
+          };
+        }
+        for (const h of hist) {
+          files[h.file_path]?.history.push([h.step, h.category, h.mult]);
+        }
+        const metaMap = Object.fromEntries(meta.map(m => [m.key, m.value]));
+        return NextResponse.json({
+          updated_step: Number(metaMap.updated_step ?? 0),
+          window: metaMap.window ? Number(metaMap.window) : null,
+          files,
+        });
+      } finally {
+        await closeDb(wdb).catch(() => undefined);
+      }
     } catch {
       return NextResponse.json(null);
     }

@@ -52,7 +52,7 @@ export default function useJobFileLoss(jobID: string, reloadInterval: number | n
   return { rows, status, refresh, hasAdjusted };
 }
 
-// one file's current adaptive weight, from <job folder>/weighting.json
+// one file's current adaptive weight, from the weighting_* tables in loss_log.db
 export interface WeightingFile {
   category: 'easy' | 'boost' | 'stuck' | 'hard' | 'healthy' | 'warming' | string;
   multiplier: number;

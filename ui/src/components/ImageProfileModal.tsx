@@ -114,7 +114,8 @@ const WEIGHT_COLORS: Record<string, string> = {
 };
 
 // Sleep-graph-style timeline of the adaptive weighting states (bars) with the
-// applied strength as an overlay line. Entries come from weighting.json and
+// applied strength as an overlay line. Entries come from the weighting_history
+// table in loss_log.db and
 // are only written when the category or strength changes.
 function WeightTimeline({ history, endStep }: { history: [number, string, number][]; endStep: number }) {
   const width = 480;
