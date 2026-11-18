@@ -196,6 +196,45 @@ export async function GET(request: NextRequest, { params }: { params: { jobID: s
       );
       return NextResponse.json({ buckets });
     }
+    // view=noise: run-level noise insight, aggregated on the fly from the
+    // per-step rows already stored — which timestep values have actually been
+    // trained (coverage histogram over 20 bins) and how the noise-adjusted
+    // loss evolved in each of the 5 noise bands (step x band heatmap).
+    if (url.searchParams.get('view') === 'noise') {
+      const range = await all<{ lo: number | null; hi: number | null }>(
+        db,
+        `SELECT MIN(step) AS lo, MAX(step) AS hi FROM file_losses`,
+      );
+      const lo = range[0]?.lo ?? 0;
+      const hi = range[0]?.hi ?? 0;
+      const coverage = await all<{ bin: number; n: number }>(
+        db,
+        `SELECT MIN(19, MAX(0, CAST(timestep * 20 / 1000 AS INTEGER))) AS bin, COUNT(*) AS n
+         FROM file_losses WHERE timestep IS NOT NULL
+         GROUP BY bin ORDER BY bin`,
+      );
+      const HEATMAP_BINS = 40;
+      const heatmap = hasRel
+        ? await all<{ sb: number; band: number; v: number; n: number }>(
+            db,
+            // MIN() keeps the newest step inside the last bin (step == hi
+            // would otherwise bin to `bins` itself)
+            `SELECT MIN(${HEATMAP_BINS - 1}, CAST((step - ?) * ? / MAX(1, ? - ?) AS INTEGER)) AS sb,
+                    MIN(4, MAX(0, CAST(timestep * 5 / 1000 AS INTEGER))) AS band,
+                    AVG(rel_loss) AS v, COUNT(*) AS n
+             FROM file_losses WHERE rel_loss IS NOT NULL AND timestep IS NOT NULL
+             GROUP BY sb, band`,
+            [lo, HEATMAP_BINS, hi, lo],
+          )
+        : [];
+      return NextResponse.json({
+        coverage,
+        heatmap,
+        min_step: range[0]?.lo ?? null,
+        max_step: range[0]?.hi ?? null,
+        heatmap_bins: HEATMAP_BINS,
+      });
+    }
     const valueCol = adjusted ? 'rel_loss' : 'loss';
 
     // Single-file mode: raw per-step series, for a loss-over-time trend view.

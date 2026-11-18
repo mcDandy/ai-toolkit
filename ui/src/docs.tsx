@@ -303,10 +303,12 @@ const docs: { [key: string]: ConfigDoc } = {
     title: 'Caption Probe',
     description: (
       <>
-        Every N steps, predicts one batch again (no gradients) with a blank caption, another image&apos;s caption and,
+        Every N training steps, predicts the batch being trained at that moment again (no gradients) with a blank
+        caption, another image&apos;s caption and,
         when the text encoder is loaded, without the trigger word. Shows whether the model uses the captions, whether
         each caption fits its own image better than another one, and whether the trigger word is bound. Costs one to
-        three extra forward passes per probe.
+        three extra forward passes per probe. Which images get probed depends on the dataset size: a given image is
+        only checked when it happens to be in the batch on a probe step.
       </>
     ),
   },
@@ -344,9 +346,10 @@ const docs: { [key: string]: ConfigDoc } = {
     title: 'Measure Every',
     description: (
       <>
-        How often (in optimizer steps) the trainable weights are measured for the Insights tab: update size, weight
-        norm, direction consistency and a trajectory snapshot. Gradient norms are collected every step regardless and
-        averaged over this window. Lower = finer trajectory and faster warnings, at a small cost per measurement.
+        How often (in training steps, the same unit as the job&apos;s Steps setting) the trainable weights are measured
+        for the Insights tab: update size, weight norm, direction consistency and a trajectory snapshot. Gradient norms
+        are collected every step regardless and averaged over this window. Lower = finer trajectory and faster warnings,
+        at a small cost per measurement.
       </>
     ),
   },
