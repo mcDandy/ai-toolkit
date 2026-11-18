@@ -462,7 +462,7 @@ const docs: { [key: string]: ConfigDoc } = {
       </>
     ),
   },
-  'weighting.easy_progressive': {
+  'weighting.easy_proportional': {
     title: 'Proportional (Easy)',
     description: (
       <>
@@ -473,7 +473,7 @@ const docs: { [key: string]: ConfigDoc } = {
       </>
     ),
   },
-  'weighting.boost_progressive': {
+  'weighting.boost_proportional': {
     title: 'Proportional (Hard)',
     description: (
       <>
@@ -483,7 +483,7 @@ const docs: { [key: string]: ConfigDoc } = {
       </>
     ),
   },
-  'weighting.stuck_progressive': {
+  'weighting.stuck_cumulative': {
     title: 'Cumulative',
     description: (
       <>

@@ -306,9 +306,9 @@ export interface WeightingConfig {
   boost_gain?: number;
   stuck_weight?: number;
   min_weight?: number;
-  easy_progressive?: boolean;
-  boost_progressive?: boolean;
-  stuck_progressive?: boolean;
+  easy_proportional?: boolean;
+  boost_proportional?: boolean;
+  stuck_cumulative?: boolean;
   easy_threshold?: number;
   hard_threshold?: number;
   improve_eps?: number;

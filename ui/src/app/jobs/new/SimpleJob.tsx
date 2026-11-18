@@ -1385,10 +1385,10 @@ export default function SimpleJob({
                   <label className="invisible block text-xs mb-1 mt-2">.</label>
                   <Checkbox
                     label="Proportional"
-                    docKey="weighting.easy_progressive"
+                    docKey="weighting.easy_proportional"
                     className="pt-[3px]"
-                    checked={weightingConfig.easy_progressive !== false}
-                    onChange={value => setJobConfig(value, 'config.process[0].weighting.easy_progressive')}
+                    checked={weightingConfig.easy_proportional !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.easy_proportional')}
                   />
                 </div>
               </div>
@@ -1431,10 +1431,10 @@ export default function SimpleJob({
                   <label className="invisible block text-xs mb-1 mt-2">.</label>
                   <Checkbox
                     label="Proportional"
-                    docKey="weighting.boost_progressive"
+                    docKey="weighting.boost_proportional"
                     className="pt-[3px]"
-                    checked={weightingConfig.boost_progressive !== false}
-                    onChange={value => setJobConfig(value, 'config.process[0].weighting.boost_progressive')}
+                    checked={weightingConfig.boost_proportional !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.boost_proportional')}
                   />
                 </div>
               </div>
@@ -1481,10 +1481,10 @@ export default function SimpleJob({
                   <label className="invisible block text-xs mb-1 mt-2">.</label>
                   <Checkbox
                     label="Cumulative"
-                    docKey="weighting.stuck_progressive"
+                    docKey="weighting.stuck_cumulative"
                     className="pt-[3px]"
-                    checked={weightingConfig.stuck_progressive !== false}
-                    onChange={value => setJobConfig(value, 'config.process[0].weighting.stuck_progressive')}
+                    checked={weightingConfig.stuck_cumulative !== false}
+                    onChange={value => setJobConfig(value, 'config.process[0].weighting.stuck_cumulative')}
                   />
                 </div>
               </div>
