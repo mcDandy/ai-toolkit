@@ -58,6 +58,8 @@ export interface WeightingFile {
   multiplier: number;
   stuck?: number;
   last_mean?: number | null;
+  // [step, category, multiplier] entries, appended only on change
+  history?: [number, string, number][];
 }
 
 export interface WeightingData {

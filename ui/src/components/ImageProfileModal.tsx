@@ -6,6 +6,7 @@ import { Dialog, DialogBackdrop, DialogPanel } from '@headlessui/react';
 import { LuLoader, LuX } from 'react-icons/lu';
 import classNames from 'classnames';
 import { apiClient } from '@/utils/api';
+import { useWeighting } from '@/hooks/useJobFileLoss';
 import LossSparkline from './LossSparkline';
 
 // One panel for everything known about a training image, opened from any view
@@ -105,6 +106,68 @@ function Bands({ bands, counts }: { bands: (number | null)[]; counts: number[] }
   );
 }
 
+const WEIGHT_COLORS: Record<string, string> = {
+  boost: '#34d399', // green
+  easy: '#38bdf8', // sky
+  stuck: '#f87171', // red
+  hard: '#fb923c', // orange
+};
+
+// Sleep-graph-style timeline of the adaptive weighting states (bars) with the
+// applied strength as an overlay line. Entries come from weighting.json and
+// are only written when the category or strength changes.
+function WeightTimeline({ history, endStep }: { history: [number, string, number][]; endStep: number }) {
+  const width = 480;
+  const height = 80;
+  const pad = 6;
+  const t0 = history[0][0];
+  const t1 = Math.max(endStep, history[history.length - 1][0]);
+  const span = Math.max(1, t1 - t0);
+  const mults = history.map(h => h[2]);
+  const lo = Math.min(...mults);
+  const hi = Math.max(...mults);
+  const xFor = (t: number) => ((t - t0) / span) * width;
+  const yFor = (m: number) =>
+    hi === lo ? height / 2 : pad + (1 - (m - lo) / (hi - lo)) * (height - pad * 2);
+  const segEnd = (i: number) => (i + 1 < history.length ? xFor(history[i + 1][0]) : width);
+  const line = history.map((h, i) => `${xFor(h[0]).toFixed(1)},${yFor(h[2]).toFixed(1)} ${segEnd(i).toFixed(1)},${yFor(h[2]).toFixed(1)}`).join(' ');
+  return (
+    <div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20 rounded bg-gray-950" preserveAspectRatio="none">
+        {history.map((h, i) => (
+          <rect
+            key={i}
+            x={xFor(h[0])}
+            y={0}
+            width={Math.max(1.5, segEnd(i) - xFor(h[0]))}
+            height={height}
+            fill={WEIGHT_COLORS[h[1]] ?? '#6b7280'}
+            opacity={0.4}
+          />
+        ))}
+        <polyline points={line} fill="none" stroke="#e5e7eb" strokeWidth={1.5} />
+      </svg>
+      <div className="flex justify-between text-[10px] text-gray-500 mt-0.5">
+        <span>step {t0.toLocaleString()}</span>
+        <span>{lo === hi ? `strength ×${lo.toFixed(2)}` : `strength ×${lo.toFixed(2)}–×${hi.toFixed(2)}`}</span>
+        <span>step {t1.toLocaleString()}</span>
+      </div>
+      <div className="flex gap-3 text-[10px] text-gray-400 mt-1">
+        {Object.entries(WEIGHT_COLORS).map(([k, c]) => (
+          <span key={k} className="flex items-center gap-1">
+            <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: c, opacity: 0.7 }} />
+            {k}
+          </span>
+        ))}
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-px bg-gray-200" />
+          weight
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'warn' | 'good' | 'info' }) {
   return (
     <div className="bg-gray-950 rounded px-2.5 py-1.5">
@@ -143,6 +206,10 @@ export default function ImageProfileModal() {
   }, [target]);
 
   const close = () => setTarget(null);
+  // current adaptive weight from the adaptive_weighting extension; the card
+  // stays completely hidden until the extension has produced data
+  const { weighting } = useWeighting(target?.jobID ?? '', 10000);
+  const weight = target && weighting ? weighting.files[target.path] : undefined;
   const [mtStatus, setMtStatus] = useState<string | null>(null);
   // only with the optional MediaTagger bridge (MEDIATAGGER_MCP_URL) configured
   const [bridge, setBridge] = useState(false);
@@ -227,6 +294,21 @@ export default function ImageProfileModal() {
                     }
                   />
                   <Stat label="Times trained" value={p.times_trained.toLocaleString()} />
+                  {weight && (
+                    <Stat
+                      label="Weight"
+                      value={`×${weight.multiplier.toFixed(2)}`}
+                      tone={
+                        weight.category === 'boost'
+                          ? 'good'
+                          : weight.category === 'stuck'
+                            ? 'warn'
+                            : weight.category === 'easy'
+                              ? 'info'
+                              : undefined
+                      }
+                    />
+                  )}
                   <Stat
                     label="Adapter can follow"
                     value={pct(p.capacity?.captured)}
@@ -241,14 +323,25 @@ export default function ImageProfileModal() {
                   </div>
                 )}
 
-                <div>
-                  <div className="text-xs uppercase text-gray-500 mb-1">Difficulty by noise level</div>
-                  {p.bands.some(b => b != null) ? (
-                    <Bands bands={p.bands} counts={p.band_counts} />
-                  ) : (
-                    <div className="text-xs text-gray-500">Not enough samples with timesteps yet.</div>
+                <div className={weight?.history?.length ? 'grid md:grid-cols-2 gap-4 items-start' : ''}>
+                  <div>
+                    <div className="text-xs uppercase text-gray-500 mb-1">Difficulty by noise level</div>
+                    {p.bands.some(b => b != null) ? (
+                      <Bands bands={p.bands} counts={p.band_counts} />
+                    ) : (
+                      <div className="text-xs text-gray-500">Not enough samples with timesteps yet.</div>
+                    )}
+                    {hint && <div className="text-xs text-gray-300 mt-1">{hint}</div>}
+                  </div>
+                  {!!weight?.history?.length && (
+                    <div>
+                      <div className="text-xs uppercase text-gray-500 mb-1">Weighting over steps</div>
+                      <WeightTimeline
+                        history={weight.history}
+                        endStep={p.history.length ? p.history[p.history.length - 1].step : weight.history[weight.history.length - 1][0]}
+                      />
+                    </div>
                   )}
-                  {hint && <div className="text-xs text-gray-300 mt-1">{hint}</div>}
                 </div>
 
                 <div>

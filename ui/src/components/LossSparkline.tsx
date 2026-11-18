@@ -112,7 +112,7 @@ export default function LossSparkline({ points, width = 560, height = 90 }: Prop
           )}
         </span>
         <span>
-          min {minLoss.toPrecision(3)} ┬Ě max {maxLoss.toPrecision(3)}
+          min {minLoss.toPrecision(3)} · max {maxLoss.toPrecision(3)}
         </span>
       </div>
       <div className="flex justify-between text-[10px] text-gray-600 mt-0.5" style={{ width }}>
