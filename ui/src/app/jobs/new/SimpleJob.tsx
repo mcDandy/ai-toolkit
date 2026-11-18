@@ -1491,13 +1491,23 @@ export default function SimpleJob({
               {/* shared settings */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
                 <NumberInput
-                  label="Window (steps)"
+                  label="Window"
                   docKey="weighting.window"
                   value={weightingConfig.window ?? null}
                   onChange={value => setJobConfig(value || null, 'config.process[0].weighting.window')}
-                  placeholder="auto: min_samples epochs"
+                  placeholder="auto: min_samples"
                   min={1}
                   allowEmpty
+                />
+                <SelectInput
+                  label="Window Unit"
+                  docKey="weighting.window_unit"
+                  value={weightingConfig.window_unit ?? 'epochs'}
+                  onChange={value => setJobConfig(value, 'config.process[0].weighting.window_unit')}
+                  options={[
+                    { value: 'epochs', label: 'Epochs (dataset passes)' },
+                    { value: 'steps', label: 'Steps (training steps)' },
+                  ]}
                 />
                 <NumberInput
                   label="Min Samples"

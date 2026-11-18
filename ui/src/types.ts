@@ -315,6 +315,7 @@ export interface WeightingConfig {
   stuck_windows?: number;
   min_samples?: number;
   window?: number | null;
+  window_unit?: 'epochs' | 'steps';
 }
 
 export interface SliderConfig {

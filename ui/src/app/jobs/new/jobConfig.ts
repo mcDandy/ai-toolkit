@@ -75,6 +75,7 @@ export const defaultWeightingConfig: WeightingConfig = {
   stuck_windows: 2,
   min_samples: 8,
   window: null,
+  window_unit: 'epochs',
 };
 
 export const defaultCompileOptions = {

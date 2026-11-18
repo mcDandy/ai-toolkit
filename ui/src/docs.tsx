@@ -371,17 +371,6 @@ const docs: { [key: string]: ConfigDoc } = {
       </>
     ),
   },
-  'weighting.window': {
-    title: 'Window',
-    description: (
-      <>
-        Training steps between re-evaluations of every image&apos;s difficulty (the same unit as the job&apos;s Steps
-        setting). Left empty it is estimated as Min Samples passes over the dataset — one epoch only shows each image
-        once, so a window shorter than Min Samples epochs could never gather enough samples to judge anything.
-        Shorter reacts faster but classifies on thinner evidence.
-      </>
-    ),
-  },
   'weighting.easy_weight': {
     title: 'Min Weight',
     description: (
@@ -448,6 +437,28 @@ const docs: { [key: string]: ConfigDoc } = {
       <>
         How many times an image must be trained inside one window before it is classified at all — below this its
         previous weight is kept. Only relevant for very small datasets or very short windows.
+      </>
+    ),
+  },
+  'weighting.window': {
+    title: 'Window',
+    description: (
+      <>
+        How often every image&apos;s difficulty is re-evaluated, in the unit picked by Window Unit: epochs (passes
+        over the dataset) or steps (training steps, the same unit as the job&apos;s Steps setting). Left empty it
+        defaults to Min Samples epochs — one epoch only shows each image once, so a window shorter than Min Samples
+        epochs could never gather enough samples to judge anything. Shorter reacts faster but classifies on thinner
+        evidence.
+      </>
+    ),
+  },
+  'weighting.window_unit': {
+    title: 'Window Unit',
+    description: (
+      <>
+        Epochs: the Window value counts full passes over the dataset, so the same value behaves the same whatever the
+        dataset size. Steps: the Window value counts individual training steps instead, for fixed wall-clock-style
+        re-evaluation on large datasets.
       </>
     ),
   },
