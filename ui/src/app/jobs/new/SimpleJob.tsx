@@ -1495,7 +1495,7 @@ export default function SimpleJob({
                   docKey="weighting.window"
                   value={weightingConfig.window ?? null}
                   onChange={value => setJobConfig(value || null, 'config.process[0].weighting.window')}
-                  placeholder="auto: one epoch"
+                  placeholder="auto: min_samples epochs"
                   min={1}
                   allowEmpty
                 />

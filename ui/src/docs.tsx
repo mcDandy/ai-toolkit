@@ -376,8 +376,9 @@ const docs: { [key: string]: ConfigDoc } = {
     description: (
       <>
         Training steps between re-evaluations of every image&apos;s difficulty (the same unit as the job&apos;s Steps
-        setting). Left empty it is estimated as roughly one pass over the dataset. Shorter reacts faster but needs
-        Min Samples per image inside each window to say anything reliable.
+        setting). Left empty it is estimated as Min Samples passes over the dataset — one epoch only shows each image
+        once, so a window shorter than Min Samples epochs could never gather enough samples to judge anything.
+        Shorter reacts faster but classifies on thinner evidence.
       </>
     ),
   },
